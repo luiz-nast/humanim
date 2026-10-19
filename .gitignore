@@ -1,0 +1,6 @@
+videos/
+.venv/
+__pycache__/
+*.pyc
+media/
+modelos/
