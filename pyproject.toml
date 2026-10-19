@@ -1,0 +1,19 @@
+[project]
+name = "humanim"
+version = "0.1.0"
+description = "O Manim com um humano dentro"
+requires-python = ">=3.12"
+dependencies = ["manim>=0.19", "numpy", "onnxruntime"]
+
+[project.scripts]
+humanim = "humanim.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["humanim"]
+
+[tool.setuptools.package-data]
+humanim = ["*.html"]
