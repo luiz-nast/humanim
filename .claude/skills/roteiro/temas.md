@@ -4,7 +4,7 @@ Ideias de vídeo, uma por item, com o slug da pasta em `videos/`. Quando um rote
 
 ## Ideias
 
-- [ ] O que é uma árvore de decisão (`arvore-de-decisao`)
+- [x] O que é uma árvore de decisão (`arvore-de-decisao`)
 - [ ] Quem foi o pai do deep learning (`pai-do-deep-learning`)
 
 ## Sugestões da IA

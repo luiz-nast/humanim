@@ -63,6 +63,13 @@ class Sessao:
         self.salvando = True
         if not self.fechar() or self.bruto.stat().st_size == 0:
             raise Erro(f"a página mandou o fim, mas a gravação não chegou. {de_novo(self.pasta)}")
+        if audio_mudo(self.bruto):
+            destino = self.pasta / "anteriores" / f"gravacao-sem-audio-{numero_livre(self.pasta)}.webm"
+            os.replace(self.bruto, destino)
+            raise Erro(f"a gravação saiu sem som: o microfone está no mudo ou é a entrada errada (guardei em "
+                       f"{relativo(destino)}, nada mais mudou). Tire o mudo em Configurações > Som > Entrada "
+                       f"(ou pactl set-source-mute @DEFAULT_SOURCE@ 0), confira a barra verde do microfone no "
+                       f"teleprompter e grave de novo. {de_novo(self.pasta)}")
         tempos = conferir(dados.get("tempos") or [], self.linhas, self.pasta)
         regravadas = sorted({int(n) for n in dados.get("regravadas") or []} & {t["linha"] for t in tempos})
         if len(tempos) < len(self.linhas) and completa(self.pasta, self.linhas):
@@ -86,6 +93,14 @@ class Sessao:
         provisorio.write_text(f"[\n{corpo}\n]\n", encoding="utf-8")
         os.replace(provisorio, destino_tempos)
         return resumo(self.pasta, self.linhas, tempos, regravadas, duracao(final), sufixo, guardada)
+
+
+def audio_mudo(arquivo):
+    """Sem trilha de áudio ou com silêncio digital (microfone no mudo no sistema)."""
+    r = subprocess.run(["ffmpeg", "-nostdin", "-i", str(arquivo), "-vn", "-af", "volumedetect", "-f", "null", "-"],
+                       capture_output=True, text=True)
+    pico = [linha.split("max_volume:")[1].split()[0] for linha in r.stderr.splitlines() if "max_volume:" in linha]
+    return not pico or pico[0] == "-inf" or float(pico[0]) <= -90
 
 
 def de_novo(pasta):

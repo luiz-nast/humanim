@@ -22,6 +22,10 @@
   #quadro { position: absolute; top: 0; bottom: 0; left: 34.18%; width: 31.64%; box-sizing: border-box;
     border: 2px solid #ffd60a; box-shadow: 0 0 0 400px rgba(0, 0, 0, .55);
     background: linear-gradient(rgba(0, 0, 0, .6) 10.4%, transparent 10.4%); }
+  #mic { height: 6px; background: #222; }
+  #nivel { height: 100%; width: 0; background: #34c759; }
+  #mudo { display: none; position: absolute; right: 24px; bottom: 190px; width: 260px; font-size: 16px;
+    color: #ff6b6b; text-align: right; }
   #rodape { position: absolute; left: 24px; bottom: 24px; font-size: 18px; color: #6e6e6e; }
   #ponto, #denovo { display: none; margin-left: 18px; }
   #ponto { color: #ff3b30; }
@@ -33,7 +37,8 @@
 <body>
 <div id="texto"><div id="atual"></div><div id="proxima"></div></div>
 <div id="aviso">Ligando a câmera…</div>
-<div id="camera"><video id="previa" autoplay muted playsinline></video><div id="quadro"></div></div>
+<div id="camera"><video id="previa" autoplay muted playsinline></video><div id="quadro"></div><div id="mic"><div id="nivel"></div></div></div>
+<div id="mudo">Microfone sem som: tire o mudo nas configurações de som.</div>
 <div id="rodape"><span id="linha"></span><span id="ponto">● gravando</span><span id="denovo">↺ de novo</span></div>
 <script>
 const $ = id => document.getElementById(id);
@@ -107,6 +112,24 @@ async function preparar() {
   rec.onstop = salvar;
   estado = 'pronto';
   aviso('Espaço para começar');
+  medidor();
+}
+
+// Barra verde com o nível do microfone; silêncio absoluto por 2 s = microfone no mudo.
+function medidor() {
+  const ctx = new AudioContext(), an = ctx.createAnalyser(), buf = new Float32Array(1024);
+  an.fftSize = buf.length;
+  ctx.createMediaStreamSource(stream).connect(an);
+  addEventListener('keydown', () => ctx.resume(), {once: true});
+  let ultimoSom = performance.now();
+  (function passo() {
+    an.getFloatTimeDomainData(buf);
+    const nivel = Math.sqrt(buf.reduce((s, x) => s + x * x, 0) / buf.length);
+    $('nivel').style.width = `${Math.min(100, nivel * 500)}%`;
+    if (nivel > 0 || ctx.state !== 'running') ultimoSom = performance.now();
+    $('mudo').style.display = performance.now() - ultimoSom > 2000 ? 'block' : 'none';
+    if (estado !== 'fim' && estado !== 'erro') requestAnimationFrame(passo);
+  })();
 }
 
 function contar(n) {
