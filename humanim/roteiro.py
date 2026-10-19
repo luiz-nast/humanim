@@ -82,7 +82,8 @@ def ler_tempos(pasta, linhas):
     dados = {d["linha"]: d for d in json.loads(arquivo.read_text(encoding="utf-8"))}
     faltam = [linha.numero for linha in linhas if linha.numero not in dados]
     if faltam:
-        raise Erro(f"tempos.json não tem a(s) linha(s) {faltam}. Grave de novo até o fim: humanim gravar roteiro.md.")
+        raise Erro(f"tempos.json não tem a(s) linha(s) {faltam}: a gravação parou antes ou o roteiro ganhou linhas "
+                   f"depois dela. Grave de novo até o fim: humanim gravar roteiro.md.")
     sobram = sorted(set(dados) - {linha.numero for linha in linhas})
     if sobram:
         raise Erro(f"tempos.json tem linha(s) {sobram} que o roteiro não tem: o roteiro mudou depois da gravação. Grave de novo.")

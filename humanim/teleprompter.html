@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>humanim · teleprompter</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #fff; overflow: hidden; cursor: none;
+    font-family: Lato, "Helvetica Neue", Arial, sans-serif; }
+  #texto { position: absolute; top: 1.5vh; left: 7vw; right: 7vw; text-align: center; }
+  #atual { font-size: clamp(36px, 4.6vw, 88px); font-weight: 700; line-height: 1.18; transition: color .15s; }
+  #proxima { margin-top: 1.1em; font-size: clamp(22px, 2.3vw, 44px); line-height: 1.25; color: #5e5e5e; }
+  .espera #atual { color: #8a8a8a; }
+  .regravou #atual { color: #ffd60a; }
+  #aviso { position: absolute; left: 8vw; right: 8vw; top: 55%; transform: translateY(-50%);
+    text-align: center; font-size: clamp(26px, 2.8vw, 52px); color: #ddd; }
+  #aviso.contagem { font-size: 24vh; font-weight: 700; color: #fff; }
+  #aviso.erro { color: #ff6b6b; font-size: clamp(22px, 2vw, 34px); }
+  #previa { position: absolute; right: 24px; bottom: 24px; width: 220px; border-radius: 8px;
+    transform: scaleX(-1); opacity: .8; background: #111; }
+  #rodape { position: absolute; left: 24px; bottom: 24px; font-size: 18px; color: #6e6e6e; }
+  #ponto, #denovo { display: none; margin-left: 18px; }
+  #ponto { color: #ff3b30; }
+  #denovo { color: #ffd60a; }
+  .gravando #ponto, .regravou #denovo { display: inline; }
+  .fim #texto { display: none; }
+</style>
+</head>
+<body>
+<div id="texto"><div id="atual"></div><div id="proxima"></div></div>
+<div id="aviso">Ligando a câmera…</div>
+<video id="previa" autoplay muted playsinline></video>
+<div id="rodape"><span id="linha"></span><span id="ponto">● gravando</span><span id="denovo">↺ de novo</span></div>
+<script>
+const $ = id => document.getElementById(id);
+const TIPOS = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+// preparando → pronto → contando → gravando → salvando → fim (ou cancelado, erro)
+let estado = 'preparando', falas = [], atual = 0, de = [], ate = [], regravadas = new Set();
+let stream, rec, t0 = 0, fila = Promise.resolve(), falhou = null;
+
+const agora = () => (performance.now() - t0) / 1000;
+
+function aviso(texto, classe = '') { $('aviso').textContent = texto; $('aviso').className = classe; }
+
+function mostrar() {
+  $('atual').textContent = falas[atual].fala;
+  $('proxima').textContent = atual + 1 < falas.length ? falas[atual + 1].fala : '(última: Espaço encerra e salva)';
+  $('linha').textContent = `linha ${atual + 1}/${falas.length}`;
+}
+
+async function postar(url, corpo) {
+  const r = await fetch(url, {method: 'POST', body: corpo});
+  if (!r.ok) throw new Error(await r.text());
+}
+
+function desligar() { if (stream) stream.getTracks().forEach(t => t.stop()); }
+
+function fim(texto, classe = '') { estado = 'fim'; document.body.className = 'fim'; aviso(texto, classe); desligar(); }
+
+function erro(texto, avisar = true) {
+  fim(texto, 'erro');
+  estado = 'erro';
+  if (avisar) postar('/erro', texto).catch(() => {});
+}
+
+function mensagemCamera(e) {
+  const m = {
+    NotAllowedError: 'o navegador não deixou usar a câmera e o microfone. Para ele perguntar de novo, apague ~/.cache/humanim/chrome (ou libere nas informações do site).',
+    NotFoundError: 'não achei câmera ou microfone ligados.',
+    NotReadableError: 'a câmera ou o microfone está em uso por outro programa. Feche o outro programa.',
+  }[e.name];
+  return 'Câmera: ' + (m || `${e.name}: ${e.message}`);
+}
+
+async function preparar() {
+  try {
+    falas = await (await fetch('/falas')).json();
+  } catch (e) { return erro('Não consegui ler o roteiro do humanim: ' + e.message, false); }
+  mostrar();
+  document.body.className = 'espera';
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {width: {ideal: 1280}, height: {ideal: 720}, frameRate: {ideal: 30}},
+      audio: {echoCancellation: false, autoGainControl: false, noiseSuppression: true},
+    });
+  } catch (e) { return erro(mensagemCamera(e)); }
+  if (estado !== 'preparando') return desligar();  // Esc enquanto ligava
+  $('previa').srcObject = stream;
+  rec = new MediaRecorder(stream, {mimeType: TIPOS.find(t => MediaRecorder.isTypeSupported(t)),
+                                   videoBitsPerSecond: 6e6, audioBitsPerSecond: 128e3});
+  rec.ondataavailable = e => {
+    const pedaco = e.data;
+    if (pedaco.size) fila = fila.then(() => falhou || postar('/pedaco', pedaco).catch(err => {
+      falhou = err;
+      erro('A gravação parou de chegar no humanim: ' + err.message);
+    }));
+  };
+  rec.onstart = () => { t0 = performance.now(); contar(3); };
+  rec.onstop = salvar;
+  estado = 'pronto';
+  aviso('Espaço para começar');
+}
+
+function contar(n) {
+  if (estado !== 'contando') return;
+  if (n === 0) {
+    de[0] = agora();
+    estado = 'gravando';
+    document.body.className = 'gravando';
+    aviso('');
+    return;
+  }
+  aviso(String(n), 'contagem');
+  setTimeout(() => contar(n - 1), t0 + (4 - n) * 1000 - performance.now());
+}
+
+async function espaco() {
+  if (estado === 'pronto') {
+    estado = 'contando';
+    aviso('3', 'contagem');
+    try { await postar('/inicio'); } catch (e) { return erro('O humanim não respondeu: ' + e.message, false); }
+    if (estado === 'contando') rec.start(1000);
+  } else if (estado === 'gravando') {
+    const t = agora();
+    if (t - de[atual] < 0.4) return;  // toque duplo sem querer
+    ate[atual] = t;
+    if (atual + 1 === falas.length) return encerrar();
+    atual++;
+    de[atual] = t;
+    mostrar();
+  }
+}
+
+function regravar() {
+  if (estado !== 'gravando') return;
+  de[atual] = agora();
+  regravadas.add(falas[atual].linha);
+  document.body.classList.add('regravou');
+  clearTimeout(regravar.t);
+  regravar.t = setTimeout(() => document.body.classList.remove('regravou'), 900);
+}
+
+function parar() {
+  if (['preparando', 'pronto', 'contando'].includes(estado)) {
+    if (rec && rec.state !== 'inactive') { rec.onstop = rec.ondataavailable = null; rec.stop(); }
+    fim('Cancelado. Nada foi gravado.');
+    estado = 'cancelado';
+    postar('/cancelar').catch(() => {});
+  } else if (estado === 'gravando') {
+    const t = agora();
+    if (t - de[atual] < 1 && atual > 0) atual--;  // tinha acabado de passar: essa linha nem começou
+    else ate[atual] = t;
+    encerrar();
+  }
+}
+
+function encerrar() {
+  estado = 'salvando';
+  document.body.className = 'fim';
+  aviso('Salvando…');
+  rec.stop();
+}
+
+async function salvar() {
+  desligar();
+  const tempos = falas.slice(0, atual + 1).map((f, i) => ({linha: f.linha, de: de[i], ate: ate[i]}));
+  try {
+    await fila;
+    if (falhou) return;
+    await postar('/fim', JSON.stringify({tempos, regravadas: [...regravadas]}));
+    fim(`Salvo: ${tempos.length} de ${falas.length} linhas. Pode fechar esta janela.`);
+    setTimeout(() => window.close(), 1500);
+  } catch (e) { erro('Não consegui salvar: ' + e.message, false); }
+}
+
+addEventListener('keydown', e => {
+  if (e.repeat) return;
+  if (e.code === 'Space') { e.preventDefault(); espaco(); }
+  else if (e.code === 'KeyR') regravar();
+  else if (e.code === 'Escape') parar();
+});
+
+addEventListener('pagehide', () => {
+  if (!['fim', 'erro', 'cancelado'].includes(estado)) navigator.sendBeacon('/fechou');
+});
+
+preparar();
+</script>
+</body>
+</html>

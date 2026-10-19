@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prévia</title>
+<style>
+:root {
+  --fundo: #0b0d10; --tela: #13161b; --borda: #262a31; --texto: #eceef1; --apagado: #858c96;
+  --CARA: #c9ced6; --ANIM: #5aa9ff; --CANTO: #ffb547; --falta: #ff6b6b;
+  --h: min(calc(100vh - 150px), calc((100vw - 96px) * 8 / 9));
+  --w: calc(var(--h) * 9 / 8 + 40px);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--fundo); color: var(--texto);
+  font-family: Lato, system-ui, sans-serif; }
+body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; overflow: hidden; }
+header, footer, #dica { width: var(--w); display: flex; justify-content: space-between; align-items: baseline;
+  gap: 16px; font-size: 13px; color: var(--apagado); }
+header b { color: var(--texto); font-size: 15px; }
+#faltam { color: var(--falta); }
+main { display: flex; gap: 40px; }
+.tela { position: relative; width: calc(var(--h) * 9 / 16); height: var(--h); border-radius: calc(var(--h) * .035);
+  overflow: hidden; background: #000;
+  box-shadow: 0 0 0 calc(var(--h) * .011) var(--borda), 0 24px 70px rgba(0,0,0,.55); }
+video { display: block; width: 100%; height: 100%; object-fit: contain; cursor: pointer; }
+#play { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; pointer-events: none;
+  font-size: calc(var(--h) * .07); color: rgba(255,255,255,.9); text-shadow: 0 2px 24px #000;
+  transition: opacity .2s; }
+#play > div { background: rgba(0,0,0,.7); padding: .3em .7em .45em; border-radius: calc(var(--h) * .02); }
+#play small { display: block; margin-top: calc(var(--h) * .025); font-size: calc(var(--h) * .018); color: var(--apagado); }
+.tocou #play { opacity: 0; }
+#roteiro { background: var(--tela); overflow-y: auto; scrollbar-width: none;
+  padding: calc(var(--h) / 2) calc(var(--h) * .035); }
+.linha { padding: calc(var(--h) * .016) 0; opacity: .28; cursor: pointer; transition: opacity .25s; }
+.linha:hover { opacity: .55; }
+.linha.atual { opacity: 1; }
+.cab { font-size: calc(var(--h) * .0145); display: flex; align-items: center; gap: .6em; }
+.num { color: var(--apagado); font-variant-numeric: tabular-nums; }
+.marca { font-weight: 700; letter-spacing: .08em; padding: .1em .6em; border-radius: 99px; border: 1px solid currentColor; }
+.aviso { color: var(--falta); font-weight: 700; }
+.desc { margin-top: .45em; font-size: calc(var(--h) * .018); color: var(--apagado); font-style: italic; line-height: 1.35; }
+.fala { margin-top: .3em; font-size: calc(var(--h) * .031); line-height: 1.3; font-weight: 700; }
+#barra { width: var(--w); display: flex; gap: 2px; height: 8px; }
+#barra div { opacity: .3; border-radius: 2px; cursor: pointer; min-width: 2px; }
+#barra div.atual { opacity: 1; }
+#barra div.falta { background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgba(0,0,0,.55) 3px 6px); }
+footer span:first-child { color: var(--texto); font-variant-numeric: tabular-nums; }
+footer span:last-child { font-variant-numeric: tabular-nums; }
+#dica { justify-content: center; font-size: 12px; }
+kbd { font-family: inherit; border: 1px solid var(--borda); border-radius: 4px; padding: 0 .4em; color: var(--texto); }
+</style>
+</head>
+<body>
+<header><span><b id="titulo"></b> · prévia</span><span id="faltam"></span></header>
+<main>
+  <div class="tela" id="esquerda"><video preload="auto" muted playsinline></video><div id="play"><div>▶<small>espaço para assistir</small></div></div></div>
+  <div class="tela" id="roteiro"></div>
+</main>
+<div id="barra"></div>
+<footer><span id="status"></span><span><span id="relogio"></span> · <kbd>espaço</kbd> play/pausa · <kbd>←</kbd> <kbd>→</kbd> linha · clique pula</span></footer>
+<div id="dica">Gostou? Diga ao Claude que o roteiro está aprovado. Não gostou? Diga o que mudar e a prévia é refeita.</div>
+<script>
+const D = __DADOS__;
+const v = document.querySelector("video"), roteiro = document.getElementById("roteiro");
+const barra = document.getElementById("barra"), rodape = document.getElementById("status");
+const relogio = document.getElementById("relogio"), esquerda = document.getElementById("esquerda");
+const N = D.linhas.length;
+document.title = D.titulo + " · prévia";
+document.getElementById("titulo").textContent = D.titulo;
+const faltam = D.linhas.filter(l => l.falta).map(l => l.n);
+if (faltam.length) document.getElementById("faltam").textContent = "falta animar: linha " + faltam.join(", ");
+
+function el(tag, classe, texto, pai) {
+  const e = document.createElement(tag);
+  if (classe) e.className = classe;
+  if (texto) e.textContent = texto;
+  pai.appendChild(e);
+  return e;
+}
+const blocos = D.linhas.map((l, i) => {
+  const b = el("div", "linha", "", roteiro);
+  const cab = el("div", "cab", "", b);
+  el("span", "num", String(l.n).padStart(2, "0"), cab);
+  el("span", "marca", l.marca, cab).style.color = `var(--${l.marca})`;
+  if (l.falta) el("span", "aviso", "falta animar", cab).title = l.falta;
+  if (l.descricao) el("div", "desc", l.descricao, b);
+  el("div", "fala", l.fala, b);
+  b.onclick = () => ir(i);
+  return b;
+});
+const segmentos = D.linhas.map((l, i) => {
+  const s = el("div", l.falta ? "falta" : "", "", barra);
+  s.style.flex = `${Math.max(l.ate - l.de, 0.01)} 1 0`;
+  s.style.background = `var(--${l.marca})`;
+  s.title = `linha ${l.n}`;
+  s.onclick = () => ir(i);
+  return s;
+});
+
+const relo = t => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
+let atual = -1;
+function indice(t) {
+  let i = 0;
+  while (i + 1 < N && D.linhas[i + 1].de <= t + 0.02) i++;
+  return i;
+}
+function marcar(i) {
+  if (i === atual) return;
+  const primeira = atual < 0;
+  atual = i;
+  blocos.forEach((b, j) => b.classList.toggle("atual", j === i));
+  segmentos.forEach((s, j) => s.classList.toggle("atual", j === i));
+  const b = blocos[i], l = D.linhas[i];
+  roteiro.scrollTo({ top: b.offsetTop - roteiro.clientHeight / 2 + b.offsetHeight / 2, behavior: primeira ? "auto" : "smooth" });
+  rodape.textContent = `linha ${l.n}/${N} · ${(l.ate - l.de).toFixed(1)} s · tempos ${D.estimado ? "estimados" : "reais"}`;
+}
+function atualizar() {
+  const t = v.currentTime || 0;
+  if (t > 0) esquerda.classList.add("tocou");
+  marcar(indice(t));
+  relogio.textContent = `${v.paused ? "❚❚" : "▶"} ${relo(t)} / ${relo(D.duracao)}`;
+}
+function ir(i) {
+  i = Math.max(0, Math.min(N - 1, i));
+  v.currentTime = D.linhas[i].de + 0.01;
+  marcar(i);
+  atualizar();
+}
+function alternar() { v.paused ? v.play() : v.pause(); }
+document.addEventListener("keydown", e => {
+  if (e.code === "Space") alternar();
+  else if (e.key === "ArrowRight") ir(atual + 1);
+  else if (e.key === "ArrowLeft") ir(atual - 1);
+  else if (e.key === "Home") ir(0);
+  else if (e.key === "End") ir(N - 1);
+  else return;
+  e.preventDefault();
+});
+v.addEventListener("click", alternar);
+v.addEventListener("play", () => { esquerda.classList.add("tocou"); atualizar(); });
+v.addEventListener("pause", atualizar);
+v.addEventListener("timeupdate", atualizar);
+v.addEventListener("seeked", atualizar);
+v.addEventListener("error", () => {
+  document.getElementById("play").innerHTML = "<div><small>não achei .trabalho/previa.mp4<br>rode: humanim previa</small></div>";
+});
+(function tique() { if (!v.paused) atualizar(); requestAnimationFrame(tique); })();
+v.src = D.video;
+atualizar();
+</script>
+</body>
+</html>
