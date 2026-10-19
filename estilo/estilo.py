@@ -41,6 +41,7 @@ MarkupText.set_default(font=FONTE)
 # Números sem LaTeX: DecimalNumber, Integer e os números de eixos saem em Text.
 DecimalNumber.set_default(mob_class=Text)
 NumberLine.set_default(label_constructor=Text)
+BarChart.set_default(bar_colors=[AZUL, VERDE, AMARELO, LARANJA, ROXO])  # o padrão do Manim some no preto
 # E no formato brasileiro: 1.234,5.
 _formatar = DecimalNumber._get_num_string
 DecimalNumber._get_num_string = lambda self, n: _formatar(self, n).translate(str.maketrans(",.", ".,"))
@@ -102,9 +103,11 @@ class CenaHumanim(Scene):
 
     def play(self, *animacoes, **kwargs):
         """O play do Manim, mas sem passar do fim da fala (fala gravada mais rápida que a estimada):
-        um run_time maior que o que resta é encurtado e, sem tempo nenhum, vai direto ao estado final."""
+        um run_time maior que o que resta é encurtado e, sem tempo nenhum, vai direto ao estado final.
+        Sobra sempre o último quadro: o Manim não desenha o instante final de um play, e é esse
+        estado final que a linha seguinte redesenha para emendar."""
         if "run_time" in kwargs:
-            kwargs["run_time"] = min(kwargs["run_time"], self.restante())
+            kwargs["run_time"] = min(kwargs["run_time"], self.restante() - 1 / FPS)
             if kwargs["run_time"] < 1 / FPS:
                 lista = self.compile_animations(*animacoes)
                 self.add_mobjects_from_animations(lista)

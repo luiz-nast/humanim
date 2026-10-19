@@ -15,8 +15,13 @@
     text-align: center; font-size: clamp(26px, 2.8vw, 52px); color: #ddd; }
   #aviso.contagem { font-size: 24vh; font-weight: 700; color: #fff; }
   #aviso.erro { color: #ff6b6b; font-size: clamp(22px, 2vw, 34px); }
-  #previa { position: absolute; right: 24px; bottom: 24px; width: 220px; border-radius: 8px;
-    transform: scaleX(-1); opacity: .8; background: #111; }
+  #camera { position: absolute; right: 24px; bottom: 24px; width: 260px; border-radius: 8px; overflow: hidden; }
+  #previa { display: block; width: 100%; transform: scaleX(-1); opacity: .8; background: #111; }
+  /* O que o vídeo usa: no [CARA], a faixa 9:16 do meio do quadro 16:9 (31,64% da largura);
+     o topo dela (200 de 1920 px) fica embaixo da interface do app. */
+  #quadro { position: absolute; top: 0; bottom: 0; left: 34.18%; width: 31.64%; box-sizing: border-box;
+    border: 2px solid #ffd60a; box-shadow: 0 0 0 400px rgba(0, 0, 0, .55);
+    background: linear-gradient(rgba(0, 0, 0, .6) 10.4%, transparent 10.4%); }
   #rodape { position: absolute; left: 24px; bottom: 24px; font-size: 18px; color: #6e6e6e; }
   #ponto, #denovo { display: none; margin-left: 18px; }
   #ponto { color: #ff3b30; }
@@ -28,7 +33,7 @@
 <body>
 <div id="texto"><div id="atual"></div><div id="proxima"></div></div>
 <div id="aviso">Ligando a câmera…</div>
-<video id="previa" autoplay muted playsinline></video>
+<div id="camera"><video id="previa" autoplay muted playsinline></video><div id="quadro"></div></div>
 <div id="rodape"><span id="linha"></span><span id="ponto">● gravando</span><span id="denovo">↺ de novo</span></div>
 <script>
 const $ = id => document.getElementById(id);
@@ -85,6 +90,10 @@ async function preparar() {
   } catch (e) { return erro(mensagemCamera(e)); }
   if (estado !== 'preparando') return desligar();  // Esc enquanto ligava
   $('previa').srcObject = stream;
+  $('previa').onloadedmetadata = () => {  // câmera que não é 16:9: a faixa usada muda de largura
+    const v = $('previa'), w = Math.min(1, v.videoHeight * 9 / 16 / v.videoWidth) * 100;
+    Object.assign($('quadro').style, {width: `${w}%`, left: `${(100 - w) / 2}%`});
+  };
   rec = new MediaRecorder(stream, {mimeType: TIPOS.find(t => MediaRecorder.isTypeSupported(t)),
                                    videoBitsPerSecond: 6e6, audioBitsPerSecond: 128e3});
   rec.ondataavailable = e => {
@@ -177,6 +186,10 @@ addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); espaco(); }
   else if (e.code === 'KeyR') regravar();
   else if (e.code === 'Escape') parar();
+});
+
+addEventListener('beforeunload', e => {
+  if (['contando', 'gravando', 'salvando'].includes(estado)) { e.preventDefault(); e.returnValue = ''; }
 });
 
 addEventListener('pagehide', () => {

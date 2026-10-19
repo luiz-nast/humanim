@@ -5,9 +5,10 @@ O áudio é sempre a voz da gravação; o roteiro só decide a imagem de cada li
 import json
 
 from .animar import assinatura
-from .comum import Erro, duracao, ok, pasta_do_video, rodar, trabalho
+from .comum import Erro, duracao, ok, pasta_do_video, relativo, rodar, trabalho
 from .formato import ALTURA, CANTO, FPS, LARGURA
 from .roteiro import ler_roteiro, ler_tempos, quadros
+from .tratar import assinatura as assinatura_gravacao, fonte_da_tratada
 
 BORDA = 4  # borda clara em volta de você no [CANTO], quando a gravação tem fundo
 X264 = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(FPS)]
@@ -31,7 +32,8 @@ def conferir_cenas(pasta, linhas, contagens):
             continue
         cena, clipe = pasta / "cenas" / f"{linha.cena}.py", pasta / "cenas" / f"{linha.cena}.mp4"
         if not clipe.exists():
-            problemas.append((linha.numero, f"falta cenas/{linha.cena}.mp4"))
+            problemas.append((linha.numero, f"falta cenas/{linha.cena}.mp4" + ("" if cena.exists() else
+                              f" e a própria cena cenas/{linha.cena}.py: escreva-a com a skill cenas")))
         elif abs((tem := contar_quadros(clipe)) - pede) > 1:
             problemas.append((linha.numero, f"a animação está desatualizada ({tem} quadros, a fala pede {pede})"))
         elif not cena.exists() or feitas.get(linha.cena) != {"hash": assinatura(cena, linha), "quadros": pede}:
@@ -41,19 +43,20 @@ def conferir_cenas(pasta, linhas, contagens):
     if problemas:
         texto = "\n".join(f"linha {n}: {p}." for n, p in problemas)
         opcoes = " ".join(f"--linha {n}" for n, _ in problemas)
-        raise Erro(f"{texto}\nRode humanim animar roteiro.md {opcoes}")
+        raise Erro(f"{texto}\nRode humanim animar {relativo(pasta / 'roteiro.md')} {opcoes}")
 
 
 def escolher_gravacao(pasta):
-    """A gravação tratada (sem fundo) se existir e for mais nova; senão a original."""
+    """A gravação tratada (sem fundo) se ela for desta gravacao.webm; senão a original."""
     original, tratada = pasta / "gravacao.webm", pasta / "gravacao-tratada.webm"
     if not original.exists():
-        raise Erro(f"falta gravacao.webm em {pasta}. Grave primeiro: humanim gravar roteiro.md")
-    if tratada.exists() and tratada.stat().st_mtime >= original.stat().st_mtime:
+        raise Erro(f"falta gravacao.webm em {pasta}. Grave primeiro: humanim gravar {relativo(pasta / 'roteiro.md')}")
+    if tratada.exists() and fonte_da_tratada(tratada) == assinatura_gravacao(original):
         return tratada, True, ""
     if tratada.exists():
-        return original, False, ("\nAtenção: gravacao-tratada.webm é mais velha que gravacao.webm e ficou de fora. "
-                                 "Para usar sem fundo: humanim tratar gravacao.webm e monte de novo.")
+        return original, False, ("\nAtenção: gravacao-tratada.webm não é desta gravacao.webm (é de outra gravação "
+                                 "ou de antes dela) e ficou de fora. Para usar sem fundo: "
+                                 f"humanim tratar {relativo(original)} e monte de novo.")
     return original, False, ""
 
 
@@ -120,7 +123,7 @@ def main(args):
     pasta = pasta_do_video(args.pasta)
     linhas = ler_roteiro(pasta)
     if not (pasta / "tempos.json").exists():
-        raise Erro(f"falta tempos.json em {pasta}. Grave primeiro: humanim gravar roteiro.md")
+        raise Erro(f"falta tempos.json em {pasta}. Grave primeiro: humanim gravar {relativo(pasta / 'roteiro.md')}")
     tempos, _ = ler_tempos(pasta, linhas)
     contagens = quadros(tempos)
     curtas = [t.linha for t, n in zip(tempos, contagens) if n < 1]
@@ -157,4 +160,4 @@ def main(args):
     por_marca = ", ".join(f"{m} {sum(1 for x in linhas if x.marca == m)}" for m in ("CARA", "ANIM", "CANTO"))
     fundo = "sem fundo (gravacao-tratada.webm)" if com_alfa else "com fundo (gravacao.webm)"
     ok(f"{saida} montado: {total / FPS:.2f}s, {len(linhas)} linhas ({por_marca}), gravação {fundo}.{aviso}\n"
-       f"Próximo: humanim frames {saida} e olhe as imagens em frames/.")
+       f"Próximo: humanim frames {relativo(saida)} e olhe as imagens em frames/.")

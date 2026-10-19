@@ -1,5 +1,7 @@
 """Peças que todos os comandos usam: saída OK/ERRO, pastas e ffmpeg."""
+import os
 import re
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -23,6 +25,11 @@ def pasta_do_video(caminho=None):
     if not (p / "roteiro.md").exists():
         raise Erro(f"{p} não tem roteiro.md. Rode o comando dentro de videos/<slug>/ ou passe um arquivo de lá.")
     return p
+
+
+def relativo(arquivo):
+    """Caminho para as dicas da saída: relativo à pasta onde o comando rodou, pronto para colar."""
+    return shlex.quote(os.path.relpath(arquivo))
 
 
 def trabalho(pasta):

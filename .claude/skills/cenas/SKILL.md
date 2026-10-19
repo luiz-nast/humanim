@@ -66,7 +66,7 @@ A tela tem 8 unidades de largura por 14,22 de altura, origem no centro (x de -4 
 - Não escreva segundos fixos que só fecham com a duração estimada: depois da gravação as durações mudam e a cena é renderizada de novo. Dose com frações (`run_time=0.2 * self.duracao`) e sincronize com `self.ate("palavra")`.
 - Perto do fim, limite a animação ao que sobra: `run_time=min(0.5, self.restante())`. Uma animação que começa na última palavra e dura mais que o resto estoura a fala.
 - Rede de segurança (fala gravada mais rápida que a estimada): todo `self.play(..., run_time=...)` é encurtado para caber no que resta e, sem tempo nenhum, pula direto para o estado final. Não vale para `self.wait(...)` nem para `play` sem `run_time`: escreva sempre o `run_time`.
-- Animação mais longa que a fala é ERRO do `animar`. Mais curta é completada com o último quadro parado, e o `animar` avisa quando sobra mais de meio segundo parado.
+- Animação mais longa que a fala é ERRO do `animar`. E o `animar` avisa (`ATENÇÃO imagem parada de Xs a Ys`) todo trecho de 1,5 s ou mais em que nada muda, inclusive o fim que o `self.completar()` preenche: ali, adiante a próxima animação ou destaque a palavra que a fala diz.
 
 ## Continuidade (`cenas/comum.py`)
 
@@ -77,15 +77,16 @@ A tela tem 8 unidades de largura por 14,22 de altura, origem no centro (x de -4 
 
 ## Conferir
 
-Rode dentro de `videos/<slug>/`:
+Rode da raiz do repositório, como no `CLAUDE.md`:
 
-1. `humanim animar roteiro.md --linha N` (pode repetir `--linha`). Sai `OK linha N: ...` ou `ERRO linha N: ...` dizendo o que fazer.
-2. `humanim frames cenas/linha_NN.mp4`: 3 prints (início, meio e fim) em `frames/`.
-3. Olhe cada print com Read. Confira: lê-se tudo? algo cortado na borda ou sobreposto? em [CANTO], o canto inferior esquerdo está vazio? a imagem bate com a fala naquele momento?
-4. Ajuste e repita até ficar bom. Para ver as zonas, rode `HUMANIM_DEPURAR=1 humanim animar roteiro.md --linha N`: desenha a zona segura (cinza) e, em [CANTO], o seu canto (vermelho tracejado). Antes de montar, rode de novo sem a variável.
-5. No fim, `humanim animar roteiro.md` sem `--linha`: renderiza todas (até 3 ao mesmo tempo) e pula as que não mudaram (`cenas/render.json`). Mudar o `comum.py` ou o estilo renderiza de novo as linhas que dependem deles.
+1. `humanim animar videos/<slug>/roteiro.md --linha N` (pode repetir `--linha`). Sai `OK linha N: ...` ou `ERRO linha N: ...` dizendo o que fazer.
+2. `humanim frames videos/<slug>/cenas/linha_NN.mp4`: 3 prints em `videos/<slug>/frames/`: `cena_NN_primeiro`, `cena_NN_meio` e `cena_NN_ultimo` (o primeiro e o último quadro de verdade).
+3. Olhe cada print com Read. Confira: lê-se tudo? algo cortado na borda ou sobreposto? em [CANTO], o canto inferior esquerdo está vazio, também no `_primeiro`? a imagem bate com a fala naquele momento?
+4. Linhas que continuam a cena: o `cena_N_ultimo` e o `cena_(N+1)_primeiro` têm que ser a mesma imagem, senão o corte salta.
+5. Ajuste e repita até ficar bom. Para ver as zonas, rode `HUMANIM_DEPURAR=1 humanim animar videos/<slug>/roteiro.md --linha N`: desenha a zona segura (cinza) e, em [CANTO], o seu canto (vermelho tracejado). Antes de montar, rode de novo sem a variável.
+6. No fim, `humanim animar videos/<slug>/roteiro.md` sem `--linha`: renderiza todas (até 3 ao mesmo tempo) e pula as que não mudaram (`cenas/render.json`). Mudar o `comum.py` ou o estilo renderiza de novo as linhas que dependem deles.
 
-Depois da gravação (`tempos.json` novo), rode `humanim animar roteiro.md` de novo: as durações reais entram sozinhas.
+Depois da gravação (`tempos.json` novo), rode `humanim animar videos/<slug>/roteiro.md` de novo: as durações reais entram sozinhas.
 
 ## Armadilhas
 
@@ -98,12 +99,12 @@ Depois da gravação (`tempos.json` novo), rode `humanim animar roteiro.md` de n
 | `Matrix`, `IntegerMatrix`, `DecimalMatrix`, `MathTable` | `Table` ou `IntegerTable`, ou quadrados com `Text` num `VGroup(...).arrange_in_grid()` |
 | `Variable` | `rotulo("nome")` ao lado de um `DecimalNumber` com updater |
 | `Brace(...).get_text/get_tex`, `BraceLabel` padrão | `BraceText(obj, "texto")` ou `BraceLabel(obj, "texto", label_constructor=Text)` |
-| `LabeledDot("a")`, `LabeledLine("a", ...)` | `LabeledDot(Text("a"))`; `Line` + `rotulo` ao lado |
-| `Graph(..., labels=True)` | `labels={v: Text(...)}` |
+| `LabeledDot("a")`, `LabeledLine("a", ...)` | `LabeledDot(Text("a", color=FUNDO))` (o ponto é branco: texto branco some); `Line` + `rotulo` ao lado |
+| `Graph(..., labels=True)` | `labels={v: Text(str(v), color=FUNDO, font_size=PEQUENO)}`; para vértices coloridos, `vertex_config={"fill_color": AZUL}` |
 | `BarChart(..., bar_names=[...])` | `BarChart` sem nomes + `rotulo` embaixo de cada barra (`chart.bars[i]`) |
 | `DecimalNumber(..., unit="%")` ou `show_ellipsis=True` | `rotulo("%")` com `.next_to(numero, RIGHT)` |
 
-Funcionam (o estilo troca o LaTeX por Text): `Integer`, `DecimalNumber`, `ChangeDecimalToValue`, `NumberLine` e `Axes` com `include_numbers`, `add_coordinates`, `get_axis_labels`, `BarChart` sem nomes, `Table`, `IntegerTable`, `DecimalTable`, `BraceText`, `LabeledArrow(Text(...))`, `Code`, `MarkupText`.
+Funcionam (o estilo troca o LaTeX por Text): `Integer`, `DecimalNumber`, `ChangeDecimalToValue`, `NumberLine` e `Axes` com `include_numbers`, `add_coordinates`, `get_axis_labels`, `BarChart` sem nomes (já sai nas cores do estilo), `Table`, `IntegerTable`, `DecimalTable`, `BraceText`, `LabeledArrow(Text(...))`, `Code`, `MarkupText`.
 
 Outras:
 

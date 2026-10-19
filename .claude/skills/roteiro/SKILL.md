@@ -59,6 +59,7 @@ A descrição é o pedido para a cena Manim daquela linha, então ela diz o que 
 - Só o que o Manim desenha bem sobre fundo preto: formas, setas, números, gráficos, linhas do tempo.
 - Ritmo de Reels, não de slide: texto na tela só como rótulo curto (até 3 palavras, num nó, eixo ou destaque). Frase ou lista de tópicos, nunca.
 - A imagem acompanha a fala daquela linha. Se a fala diz "aprovado", é ali que "aprovado" acende.
+- Sem colchetes dentro da descrição nem da fala: o primeiro `]` fecha a marca. Use parênteses ou aspas (`[ANIM: o vetor (0, 1, 0) acende]`).
 - Linhas seguidas podem continuar a mesma cena ("o caminho até 'aprovado' acende" continua a árvore de antes).
 - Em `[CANTO]`, a cena é mais simples e deixa um canto livre para quem apresenta.
 - Precisa de foto (ex.: o rosto de um pesquisador)? Escreva `foto: …` na descrição e avise no chat. Quem apresenta decide.
@@ -87,7 +88,7 @@ No chat, nesta ordem:
 ## Ajustes
 
 - "Ajusta a linha 3 de videos/arvore-de-decisao": mude só a linha 3 daquela pasta e mostre como ficou.
-- Se a pasta já tem `tempos.json` ou `gravacao.webm`, avise antes de incluir, tirar ou trocar linhas de lugar: os tempos gravados deixam de bater e a gravação precisa ser refeita.
+- Se a pasta já tem `tempos.json` ou `gravacao.webm`, avise antes de incluir, tirar ou trocar linhas de lugar, ou de mudar o texto de uma fala: os tempos gravados deixam de bater (ou o áudio fica com o texto antigo) e a gravação precisa ser refeita. Mudar só a descrição de [ANIM] ou [CANTO] não pede gravação nova.
 - Quando quem apresenta reescrever uma fala com as próprias palavras, ofereça guardar a frase em `voz.md`. É assim que a skill fica mais parecida com quem apresenta a cada vídeo.
 
 ## Ideias de vídeo

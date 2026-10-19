@@ -9,4 +9,6 @@ export PKG_CONFIG_PATH="$(brew --prefix)/lib/pkgconfig:$(brew --prefix)/share/pk
 
 uv venv -p 3.12 .venv
 uv pip install -p .venv/bin/python -e .
-echo "OK instalado. Use .venv/bin/humanim"
+mkdir -p ~/.local/bin
+ln -sf "$PWD/.venv/bin/humanim" ~/.local/bin/humanim  # ~/.local/bin já está no PATH do Ubuntu
+echo "OK instalado: humanim (link em ~/.local/bin; se o terminal não achar, abra um novo ou use .venv/bin/humanim)"

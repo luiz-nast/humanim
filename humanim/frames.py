@@ -3,7 +3,7 @@ import re
 import shutil
 from pathlib import Path
 
-from .comum import Erro, ok, pasta_do_video, rodar
+from .comum import Erro, ok, pasta_do_video, relativo, rodar
 from .formato import FPS
 from .montar import contar_quadros
 from .roteiro import ler_roteiro, ler_tempos, quadros
@@ -25,17 +25,19 @@ def extrair(video, indices, destinos):
 
 
 def prints_da_cena(video, numero):
-    """Clipe de uma cena: início, meio e fim, para ver a animação sem montar o vídeo."""
+    """Clipe de uma cena: primeiro, meio e último quadro. O primeiro e o último mostram o canto e as emendas."""
     pasta = video.parent.parent / "frames"
     pasta.mkdir(exist_ok=True)
     for velho in pasta.glob(f"cena_{numero:02d}_*.png"):
         velho.unlink()
     n = contar_quadros(video)
-    indices = [min(n - 1, int(n * f)) for f in (0.10, 0.50, 0.95)]
-    destinos = [pasta / f"cena_{numero:02d}_{nome}.png" for nome in ("inicio", "meio", "fim")]
+    indices = [0, n // 2, n - 1]
+    destinos = [pasta / f"cena_{numero:02d}_{nome}.png" for nome in ("primeiro", "meio", "ultimo")]
     extrair(video, indices, destinos)
     lista = "\n".join(f"{d.name}  {i / FPS:.2f}s" for d, i in zip(destinos, indices))
-    ok(f"3 prints de cenas/{video.name} ({n} quadros, {n / FPS:.2f}s) em {pasta}/ (540x960):\n{lista}")
+    emenda = (f"\nSe a cena continua a da linha {numero - 1}, o primeiro quadro tem que ser igual a "
+              f"cena_{numero - 1:02d}_ultimo.png.") if numero > 1 else ""
+    ok(f"3 prints de cenas/{video.name} ({n} quadros, {n / FPS:.2f}s) em {relativo(pasta)}/ (540x960):\n{lista}{emenda}")
 
 
 def prints_por_linha(video):
@@ -47,7 +49,7 @@ def prints_por_linha(video):
     tem = contar_quadros(video)
     if abs(tem - sum(contagens)) > 1:
         raise Erro(f"{video.name} tem {tem} quadros, mas roteiro.md com tempos.json pede {sum(contagens)}: "
-                   f"o vídeo é de antes da última mudança. Rode humanim montar de novo.")
+                   f"o vídeo é de antes da última mudança. Rode humanim montar {relativo(pasta)} de novo.")
     destino = pasta / "frames"
     shutil.rmtree(destino, ignore_errors=True)
     destino.mkdir()
@@ -59,15 +61,19 @@ def prints_por_linha(video):
     extrair(video, indices, destinos)
     lista = "\n".join(f"{d.name}  {i / FPS:.2f}s  {linha.descricao or 'você em tela cheia'}"
                       for d, i, linha in zip(destinos, indices, linhas))
-    ok(f"{len(destinos)} prints de {video.name} em {destino}/ (540x960), um no meio de cada linha. "
+    ok(f"{len(destinos)} prints de {video.name} em {relativo(destino)}/ (540x960), um no meio de cada linha. "
        f"Olhe cada um e confira com o roteiro:\n{lista}")
 
 
 def main(args):
     video = Path(args.video).resolve() if args.video else pasta_do_video() / "saida.mp4"
-    if not video.exists():
-        raise Erro(f"{video} não existe. Rode humanim montar antes (ou passe o vídeo certo).")
     cena = re.fullmatch(r"linha_(\d+)\.mp4", video.name)
+    if not video.exists() and cena:
+        raise Erro(f"{relativo(video)} não existe. Renderize a cena antes: "
+                   f"humanim animar {relativo(video.parent.parent / 'roteiro.md')} --linha {int(cena.group(1))}")
+    if not video.exists():
+        raise Erro(f"{relativo(video)} não existe. Rode humanim montar {relativo(video.parent)} antes "
+                   f"(ou passe o vídeo certo).")
     if cena and video.parent.name == "cenas":
         prints_da_cena(video, int(cena.group(1)))
     else:

@@ -35,6 +35,20 @@ def fim(log):
     return "\n".join(log.read_text(errors="replace").strip().splitlines()[-6:])
 
 
+def assinatura(gravacao):
+    """Identidade da gravação original. A tratada guarda a de quem veio, e o montar confere antes de usar."""
+    st = gravacao.stat()
+    return f"{st.st_size}-{st.st_mtime_ns}"
+
+
+def fonte_da_tratada(tratada):
+    """A assinatura da original que a tratada guardou ('' se não tem: tratada de outra versão)."""
+    saida = rodar(["ffprobe", "-v", "error", "-show_entries", "format_tags", "-of", "json", tratada],
+                  f"ffprobe em {tratada.name}")
+    tags = json.loads(saida).get("format", {}).get("tags", {})
+    return {k.lower(): v for k, v in tags.items()}.get("humanim_fonte", "")
+
+
 def carregar_modelo():
     if not MODELO.exists():
         print(f"baixando o modelo de fundo (RVM mobilenetv3, 15 MB) para {curto(MODELO)} ...", flush=True)
@@ -60,8 +74,10 @@ def main(args):
     if entrada.stem.endswith("-tratada"):
         raise Erro(f"{entrada.name} já é a tratada. Passe a gravação original: humanim tratar {curto(pasta)}/gravacao.webm")
     saida = entrada.with_name(f"{entrada.stem}-tratada.webm")
-    if saida.exists() and saida.stat().st_mtime >= entrada.stat().st_mtime:
-        ok(f"{curto(saida)} já está tratada (é mais nova que {entrada.name}). Para refazer, apague-a.")
+    antes = entrada.stat()
+    fonte = assinatura(entrada)
+    if saida.exists() and fonte_da_tratada(saida) == fonte:
+        ok(f"{curto(saida)} já está tratada (é desta {entrada.name}). Para refazer, apague-a.")
         return
 
     fluxos = json.loads(rodar(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,width,height",
@@ -90,7 +106,7 @@ def main(args):
                             "-i", entrada, "-map", "0:v", "-map", "1:a?",
                             "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-crf", "30", "-b:v", "0",
                             "-deadline", "realtime", "-cpu-used", "8", "-row-mt", "1",
-                            "-c:a", "copy", "-f", "webm", parcial],
+                            "-c:a", "copy", "-metadata", f"humanim_fonte={fonte}", "-f", "webm", parcial],
                            stdin=subprocess.PIPE, stderr=log_enc.open("w"))
     tamanho = 3 * w * h * 4
     estado = {f"r{i}i": np.zeros((1, 1, 1, 1), np.float32) for i in range(1, 5)}
@@ -126,6 +142,12 @@ def main(args):
         parcial.unlink(missing_ok=True)
         raise
     segundos = time.monotonic() - inicio
+    # Gravaram de novo enquanto o tratar rodava: esta tratada é da gravação velha, que já saiu do lugar.
+    agora = entrada.stat() if entrada.exists() else None
+    if not agora or (agora.st_ino, agora.st_size, agora.st_mtime_ns) != (antes.st_ino, antes.st_size, antes.st_mtime_ns):
+        parcial.unlink(missing_ok=True)
+        raise Erro(f"{curto(entrada)} mudou enquanto o tratar rodava (gravaram de novo?): nada foi salvo. "
+                   f"Rode de novo: humanim tratar {curto(entrada)}")
     parcial.replace(saida)
     sem_audio = "" if tem_audio else " ATENÇÃO: a gravação não tem áudio."
     ok(f"{curto(saida)}: {n / FPS:.1f}s, {n} quadros a {FPS} fps, com transparência. "

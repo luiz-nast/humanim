@@ -13,13 +13,12 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from .comum import RAIZ, Erro, duracao, ok, pasta_do_video, rodar, trabalho
-from .roteiro import ler_roteiro
+from .comum import RAIZ, Erro, duracao, ok, pasta_do_video, relativo, rodar, trabalho
+from .roteiro import ler_roteiro, ler_tempos
 
 PAGINA = Path(__file__).with_name("teleprompter.html")
 PERFIL_CHROME = Path.home() / ".cache" / "humanim" / "chrome"
 GUARDAR = ["gravacao.webm", "tempos.json", "gravacao-tratada.webm"]
-DE_NOVO = "Rode de novo: humanim gravar roteiro.md"
 
 
 class Sessao:
@@ -33,6 +32,7 @@ class Sessao:
         self.fim = threading.Event()
         self.resultado = None  # linhas do OK, ou um Erro
         self.fechou_em = None
+        self.salvando = False  # a janela pode fechar enquanto salva: aí o que vale é o salvar
 
     def terminar(self, resultado):
         if not self.fim.is_set():
@@ -60,13 +60,20 @@ class Sessao:
         return False
 
     def salvar(self, dados):
+        self.salvando = True
         if not self.fechar() or self.bruto.stat().st_size == 0:
-            raise Erro(f"a página mandou o fim, mas a gravação não chegou. {DE_NOVO}")
-        tempos = conferir(dados.get("tempos") or [], self.linhas)
+            raise Erro(f"a página mandou o fim, mas a gravação não chegou. {de_novo(self.pasta)}")
+        tempos = conferir(dados.get("tempos") or [], self.linhas, self.pasta)
         regravadas = sorted({int(n) for n in dados.get("regravadas") or []} & {t["linha"] for t in tempos})
-        sufixo = guardar_anteriores(self.pasta)
+        if len(tempos) < len(self.linhas) and completa(self.pasta, self.linhas):
+            # Parcial (Esc sem querer, tentativa abandonada) não tira do lugar uma gravação completa.
+            sufixo = numero_livre(self.pasta)
+            final = self.pasta / "anteriores" / f"gravacao-{sufixo}.webm"
+            destino_tempos, guardada = final.with_name(f"tempos-{sufixo}.json"), True
+        else:
+            sufixo, guardada = guardar_anteriores(self.pasta), False
+            final, destino_tempos = self.pasta / "gravacao.webm", self.pasta / "tempos.json"
 
-        final = self.pasta / "gravacao.webm"
         arrumado = self.bruto.with_name("arrumado.webm")
         try:  # copia sem recodificar só para o webm ganhar duração e índice (fica pulável)
             rodar(["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", self.bruto, "-c", "copy", arrumado], "ffmpeg")
@@ -74,64 +81,97 @@ class Sessao:
             self.bruto.unlink()
         except Erro:
             os.replace(self.bruto, final)
-        provisorio = self.pasta / "tempos.json.tmp"
-        provisorio.write_text("[\n" + ",\n".join(json.dumps(t) for t in tempos) + "\n]\n", encoding="utf-8")
-        os.replace(provisorio, self.pasta / "tempos.json")
-        return resumo(self.pasta, self.linhas, tempos, regravadas, duracao(final), sufixo)
+        provisorio = destino_tempos.with_name(destino_tempos.name + ".tmp")
+        corpo = ",\n".join(json.dumps(t, ensure_ascii=False) for t in tempos)
+        provisorio.write_text(f"[\n{corpo}\n]\n", encoding="utf-8")
+        os.replace(provisorio, destino_tempos)
+        return resumo(self.pasta, self.linhas, tempos, regravadas, duracao(final), sufixo, guardada)
 
 
-def conferir(tempos, linhas):
+def de_novo(pasta):
+    return f"Rode de novo: humanim gravar {relativo(pasta / 'roteiro.md')}"
+
+
+def conferir(tempos, linhas, pasta):
     """Tempos como vieram da página, conferidos: linhas em ordem a partir da 1, sem voltar no tempo."""
     if not tempos:
-        raise Erro(f"nenhuma linha foi falada: nada foi salvo. {DE_NOVO}")
+        raise Erro(f"nenhuma linha foi falada: nada foi salvo. {de_novo(pasta)}")
     certos, anterior = [], 0.0
     for t, linha in zip(tempos, linhas):
         de, ate = float(t["de"]), float(t["ate"])
         if int(t["linha"]) != linha.numero or de < anterior - 0.001 or ate <= de:
-            raise Erro(f"os tempos da linha {linha.numero} vieram errados da página ({de:.2f}s a {ate:.2f}s). {DE_NOVO}")
-        certos.append({"linha": linha.numero, "de": round(de, 3), "ate": round(ate, 3)})
+            raise Erro(f"os tempos da linha {linha.numero} vieram errados da página ({de:.2f}s a {ate:.2f}s). "
+                       f"{de_novo(pasta)}")
+        # A fala vai junto: se o roteiro mudar depois, ler_tempos avisa que o áudio é o texto antigo.
+        certos.append({"linha": linha.numero, "de": round(de, 3), "ate": round(ate, 3), "fala": linha.fala})
         anterior = ate
     if len(tempos) > len(linhas):
-        raise Erro(f"a página mandou mais linhas que o roteiro tem. {DE_NOVO}")
+        raise Erro(f"a página mandou mais linhas que o roteiro tem. {de_novo(pasta)}")
     return certos
 
 
-def guardar_anteriores(pasta):
-    """Move gravação, tempos e gravação tratada antigos para .trabalho/anteriores/, com o mesmo sufixo."""
-    velhos = [pasta / nome for nome in GUARDAR if (pasta / nome).exists()]
-    if not velhos:
-        return None
-    destino = trabalho(pasta) / "anteriores"
+def completa(pasta, linhas):
+    """Se a pasta já tem uma gravação com todas as linhas do roteiro (a que animar e montar aceitam)."""
+    if not (pasta / "gravacao.webm").exists() or not (pasta / "tempos.json").exists():
+        return False
+    try:
+        ler_tempos(pasta, linhas)
+    except Erro:
+        return False
+    return True
+
+
+def numero_livre(pasta):
+    """Primeiro sufixo N sem nenhum arquivo em anteriores/ (fora de .trabalho, que pode ser apagada)."""
+    destino = pasta / "anteriores"
     destino.mkdir(exist_ok=True)
     n = 1
-    while any((destino / f"{v.stem}-{n}{v.suffix}").exists() for v in velhos):
+    while any((destino / f"{Path(nome).stem}-{n}{Path(nome).suffix}").exists() for nome in GUARDAR):
         n += 1
-    for v in velhos:
-        os.replace(v, destino / f"{v.stem}-{n}{v.suffix}")
     return n
 
 
-def resumo(pasta, linhas, tempos, regravadas, segundos, sufixo):
+def guardar_anteriores(pasta):
+    """Move gravação, tempos e gravação tratada antigos para anteriores/, com o mesmo sufixo."""
+    velhos = [pasta / nome for nome in GUARDAR if (pasta / nome).exists()]
+    if not velhos:
+        return None
+    n = numero_livre(pasta)
+    for v in velhos:
+        os.replace(v, pasta / "anteriores" / f"{v.stem}-{n}{v.suffix}")
+    return n
+
+
+def resumo(pasta, linhas, tempos, regravadas, segundos, sufixo, guardada=False):
     try:
         nome = pasta.relative_to(RAIZ)
     except ValueError:
         nome = pasta
     feitas, total = len(tempos), len(linhas)
-    texto = [f"gravacao.webm ({segundos:.1f}s) e tempos.json em {nome}/: linhas 1 a {feitas} de {total}"
+    arquivos = (f"anteriores/gravacao-{sufixo}.webm e anteriores/tempos-{sufixo}.json" if guardada
+                else "gravacao.webm e tempos.json")
+    texto = [f"{arquivos} ({segundos:.1f}s) em {nome}/: linhas 1 a {feitas} de {total}"
              + (f", regravadas: {', '.join(map(str, regravadas))}" if regravadas else ", nenhuma regravada")
              + f". Fala de {tempos[0]['de']:.1f}s a {tempos[-1]['ate']:.1f}s."]
-    if sufixo:
-        texto.append(f"A gravação anterior foi para .trabalho/anteriores/ (sufixo -{sufixo}).")
+    if sufixo and not guardada:
+        texto.append(f"A gravação anterior foi para anteriores/ (sufixo -{sufixo}).")
     if segundos + 0.5 < tempos[-1]["ate"]:
         texto.append(f"ATENÇÃO o vídeo tem {segundos:.1f}s, mas a última fala termina em {tempos[-1]['ate']:.1f}s: "
                      f"algum pedaço se perdeu. Confira com humanim frames ou grave de novo.")
-    if feitas < total:
+    roteiro = relativo(pasta / "roteiro.md")
+    if guardada:
+        texto[0] = "gravação PARCIAL guardada à parte: " + texto[0]
+        texto.append("A gravação completa de antes continua valendo: gravacao.webm e tempos.json não mudaram. "
+                     f"Para trocar por uma nova, grave de novo até o fim: humanim gravar {roteiro}")
+    elif feitas < total:
         texto[0] = "gravação PARCIAL salva: " + texto[0]
         texto.append(f"Faltam as linhas {feitas + 1} a {total}: animar e montar precisam de todas. "
-                     "Grave de novo até o fim: humanim gravar roteiro.md (esta parcial vai para .trabalho/anteriores/).")
+                     f"Grave de novo até o fim: humanim gravar {roteiro} (esta parcial vai para anteriores/).")
     else:
         texto[0] = "gravação salva: " + texto[0]
-        texto.append("Próximo: humanim animar roteiro.md (refaz as cenas com os tempos reais), depois humanim montar.")
+        texto.append(f"Próximo: humanim animar {roteiro} (refaz as cenas com os tempos reais), depois "
+                     f"humanim tratar {relativo(pasta / 'gravacao.webm')} (em segundo plano), depois "
+                     f"humanim montar {relativo(pasta)}")
     return texto
 
 
@@ -162,7 +202,7 @@ class Pagina(BaseHTTPRequestHandler):
     def do_POST(self):
         s = self.server.sessao
         corpo = self.rfile.read(int(self.headers.get("Content-Length") or 0))
-        fim = None
+        fim, codigo, texto = None, 200, "ok"
         try:
             if self.path == "/inicio":
                 s.comecar()
@@ -173,20 +213,23 @@ class Pagina(BaseHTTPRequestHandler):
             elif self.path == "/cancelar":
                 fim = Erro("cancelado antes de começar: nada foi gravado (arquivos anteriores ficaram como estavam).")
             elif self.path == "/erro":
-                fim = Erro(f"o teleprompter avisou: {corpo.decode(errors='replace')} {DE_NOVO}")
+                fim = Erro(f"o teleprompter avisou: {corpo.decode(errors='replace')} {de_novo(s.pasta)}")
             elif self.path == "/fechou":
                 s.fechou_em = time.monotonic()
             else:
-                return self.responder(404, "não existe")
-            self.responder(200, "ok")
+                codigo, texto = 404, "não existe"
         except Erro as e:
-            self.responder(500, str(e))
-            fim = e
+            codigo, texto, fim = 500, str(e), e
         except Exception as e:  # noqa: BLE001 — qualquer falha aqui tem de virar ERRO, não travar o CLI
-            self.responder(500, repr(e))
-            fim = Erro(f"falha no servidor do teleprompter ao tratar {self.path}: {e!r}. {DE_NOVO}")
-        if fim is not None:
-            s.terminar(fim)
+            codigo, texto = 500, repr(e)
+            fim = Erro(f"falha no servidor do teleprompter ao tratar {self.path}: {e!r}. {de_novo(s.pasta)}")
+        try:
+            self.responder(codigo, texto)
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # a janela fechou antes da resposta: o que foi salvo vale do mesmo jeito
+        finally:
+            if fim is not None:
+                s.terminar(fim)
 
 
 def abrir(url):
@@ -218,10 +261,11 @@ def main(args):
         abrir(url)
     try:
         while not sessao.fim.wait(0.5):
-            if sessao.fechou_em and time.monotonic() - sessao.fechou_em > 5:
-                sessao.terminar(Erro(f"a janela do teleprompter fechou antes de salvar: nada foi gravado. {DE_NOVO}"))
+            if sessao.fechou_em and not sessao.salvando and time.monotonic() - sessao.fechou_em > 5:
+                sessao.terminar(Erro(f"a janela do teleprompter fechou antes de salvar: nada foi gravado. "
+                                     f"{de_novo(pasta)}"))
     except KeyboardInterrupt:
-        raise Erro(f"interrompido (Ctrl+C) antes de salvar: nada foi gravado. {DE_NOVO}") from None
+        raise Erro(f"interrompido (Ctrl+C) antes de salvar: nada foi gravado. {de_novo(pasta)}") from None
     finally:
         servidor.shutdown()
         servidor.server_close()

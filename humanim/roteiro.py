@@ -3,7 +3,7 @@ import json
 import re
 from dataclasses import dataclass
 
-from .comum import Erro
+from .comum import Erro, relativo
 from .formato import FPS
 
 MARCA = re.compile(r"^\[(CARA|ANIM|CANTO)(?::\s*([^\]]*))?\]\s*(.*)$")
@@ -43,6 +43,11 @@ def palavras(fala):
     return len(re.findall(r"\w+", fala))
 
 
+def falado(fala):
+    """O que se fala, sem pontuação nem maiúsculas: trocar só uma vírgula não muda a gravação."""
+    return re.findall(r"\w+", fala.lower())
+
+
 def ler_roteiro(pasta):
     texto = (pasta / "roteiro.md").read_text(encoding="utf-8").rstrip("\n")
     if not texto.strip():
@@ -61,6 +66,9 @@ def ler_roteiro(pasta):
             raise Erro(f"linha {n}: [{marca}] precisa dizer o que aparece: [{marca}: o que aparece] fala.")
         if not fala:
             raise Erro(f"linha {n} não tem fala depois da marca.")
+        if "[" in descricao or "]" in fala:
+            raise Erro(f"linha {n}: colchete dentro da descrição ou da fala (o primeiro ']' fecha a marca). "
+                       f"Troque por parênteses ou aspas.")
         linhas.append(Linha(n, marca, descricao, fala))
     return linhas
 
@@ -72,6 +80,7 @@ def ler_tempos(pasta, linhas):
     Sem ele, são estimados pelo tamanho da fala, um atrás do outro a partir do zero.
     """
     arquivo = pasta / "tempos.json"
+    gravar = f"humanim gravar {relativo(pasta / 'roteiro.md')}"
     if not arquivo.exists():
         tempos, t = [], 0.0
         for linha in linhas:
@@ -79,15 +88,28 @@ def ler_tempos(pasta, linhas):
             tempos.append(Tempo(linha.numero, round(t, 3), round(t + d, 3)))
             t += d
         return tempos, True
-    dados = {d["linha"]: d for d in json.loads(arquivo.read_text(encoding="utf-8"))}
+    try:
+        dados = {int(d["linha"]): (float(d["de"]), float(d["ate"]), d.get("fala"))
+                 for d in json.loads(arquivo.read_text(encoding="utf-8"))}
+    except (ValueError, KeyError, TypeError, AttributeError) as e:
+        raise Erro(f"tempos.json não dá para ler ({type(e).__name__}: {e}). O formato é "
+                   f'[{{"linha": 1, "de": 0.0, "ate": 3.4}}, ...]: conserte o arquivo ou grave de novo: '
+                   f"{gravar}") from None
     faltam = [linha.numero for linha in linhas if linha.numero not in dados]
     if faltam:
         raise Erro(f"tempos.json não tem a(s) linha(s) {faltam}: a gravação parou antes ou o roteiro ganhou linhas "
-                   f"depois dela. Grave de novo até o fim: humanim gravar roteiro.md.")
+                   f"depois dela. Grave de novo até o fim: {gravar}")
     sobram = sorted(set(dados) - {linha.numero for linha in linhas})
     if sobram:
-        raise Erro(f"tempos.json tem linha(s) {sobram} que o roteiro não tem: o roteiro mudou depois da gravação. Grave de novo.")
-    tempos = [Tempo(n.numero, float(dados[n.numero]["de"]), float(dados[n.numero]["ate"])) for n in linhas]
+        raise Erro(f"tempos.json tem linha(s) {sobram} que o roteiro não tem: o roteiro mudou depois da gravação. "
+                   f"Grave de novo: {gravar}")
+    # O gravar guarda a fala que estava no teleprompter; tempos.json antigos não têm.
+    mudou = [n for n in linhas if dados[n.numero][2] is not None and falado(dados[n.numero][2]) != falado(n.fala)]
+    if mudou:
+        raise Erro(f"a fala da(s) linha(s) {[n.numero for n in mudou]} mudou no roteiro.md depois da gravação, mas o "
+                   f'áudio é o texto antigo (linha {mudou[0].numero} gravada: "{dados[mudou[0].numero][2]}"). '
+                   f"Volte o texto ou grave de novo: {gravar}")
+    tempos = [Tempo(n.numero, *dados[n.numero][:2]) for n in linhas]
     for t in tempos:
         if t.duracao <= 0:
             raise Erro(f"linha {t.linha} do tempos.json termina antes de começar. Grave de novo.")

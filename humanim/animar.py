@@ -9,12 +9,13 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from .comum import RAIZ, Erro, ok, pasta_do_video, rodar, trabalho
+from .comum import RAIZ, Erro, ok, pasta_do_video, relativo, rodar, trabalho
 from .formato import ALTURA, FPS, LARGURA
 from .roteiro import ler_roteiro, ler_tempos, quadros
 
 ESTILO = RAIZ / "estilo"
 PARALELO = int(os.environ.get("HUMANIM_PARALELO", 3))
+PARADA = 1.5  # segundos de imagem parada que já pedem aviso ("algo muda a cada segundo")
 # Roda o manim com traceback comum do Python (o padrão é uma caixa do rich, difícil de ler).
 MANIM = ("import sys, traceback, manim; "
          "manim.error_console.print_exception = lambda *a, **k: traceback.print_exc(); "
@@ -37,6 +38,16 @@ def assinatura(cena, linha):
         h.update(arq.read_bytes() if arq.exists() else b"-")
     h.update(f"{linha.marca}|{linha.fala}|{os.environ.get('HUMANIM_DEPURAR', '')}".encode())
     return h.hexdigest()[:16]
+
+
+def paradas(video):
+    """Trechos (de, até) em segundos em que a imagem fica parada PARADA segundos ou mais.
+    Limiar baixo (-80 dB): um ponto pequeno andando muda pouco a média do quadro, mas não é parada."""
+    r = subprocess.run(["ffmpeg", "-nostdin", "-i", str(video), "-vf", f"freezedetect=n=-80dB:d={PARADA}",
+                        "-f", "null", "-"], capture_output=True, text=True)
+    inicios = [float(x) for x in re.findall(r"freeze_start: ([\d.]+)", r.stderr)]
+    fins = [float(x) for x in re.findall(r"freeze_end: ([\d.]+)", r.stderr)]
+    return list(zip(inicios, fins + [None] * (len(inicios) - len(fins))))
 
 
 def explicar_falha(stderr, cena):
@@ -96,13 +107,15 @@ def animar_linha(pasta, linha, alvo, antes):
               f"ffmpeg ao gravar cenas/{nome}.mp4")
         if contar_quadros(temp) != alvo:
             raise Erro(f"cenas/{nome}.mp4 não saiu com {alvo} quadros. Rode de novo; se repetir, é bug do animar.")
+        parado = paradas(temp)
         temp.replace(clipe)
     except Erro as e:
         return "erro", f"linha {n}: {e}", None
     msg = f"linha {n}: cenas/{nome}.mp4 ({alvo / FPS:.2f}s, {alvo} quadros)"
-    if alvo - tem > FPS // 2:
-        msg += (f"; a cena acabou em {tem / FPS:.2f}s e o resto ficou parado. "
-                f"Termine com self.completar() ou alongue as animações")
+    if parado:
+        trechos = ", ".join(f"{de:.1f}s a {(ate if ate is not None else alvo / FPS):.1f}s" for de, ate in parado)
+        msg += (f"; ATENÇÃO imagem parada de {trechos}: faça algo mudar ali "
+                f"(a próxima animação mais cedo, ou um destaque na palavra que a fala diz ali)")
     return "feita", msg, entrada
 
 
@@ -127,19 +140,30 @@ def main(args):
     arquivo = pasta / "cenas" / "render.json"
     cache = json.loads(arquivo.read_text(encoding="utf-8")) if arquivo.exists() else {}
     falhas, renderizadas = [], 0
-    with ThreadPoolExecutor(PARALELO) as ex:
-        tarefas = [ex.submit(animar_linha, pasta, linha, alvos[linha.numero], cache.get(linha.cena))
-                   for linha in escolhidas]
-        for linha, tarefa in zip(escolhidas, tarefas):
-            estado, msg, entrada = tarefa.result()
+    ex = ThreadPoolExecutor(PARALELO)
+    tarefas = {linha.cena: ex.submit(animar_linha, pasta, linha, alvos[linha.numero], cache.get(linha.cena))
+               for linha in escolhidas}
+    try:
+        for linha in escolhidas:
+            estado, msg, _ = tarefas[linha.cena].result()
             print(f"{'ERRO' if estado == 'erro' else 'OK'} {msg}", flush=True)
-            if estado != "erro":
-                renderizadas += estado == "feita"
-                cache[linha.cena] = entrada
-            else:
+            renderizadas += estado == "feita"
+            if estado == "erro":
                 falhas.append(linha.numero)
-                cache.pop(linha.cena, None)
-    arquivo.write_text(json.dumps(cache, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    except KeyboardInterrupt:
+        ex.shutdown(wait=False, cancel_futures=True)  # as da fila nem começam
+        raise
+    finally:
+        # Anota as que terminaram, mesmo com Ctrl+C: o próximo animar não refaz essas.
+        for cena, tarefa in tarefas.items():
+            if tarefa.done() and not tarefa.cancelled() and tarefa.exception() is None:
+                estado, _, entrada = tarefa.result()
+                if estado == "erro":
+                    cache.pop(cena, None)
+                else:
+                    cache[cena] = entrada
+        arquivo.write_text(json.dumps(cache, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    ex.shutdown()
 
     origem = ("tempos estimados (sem tempos.json; depois de gravar, rode animar de novo)" if estimado
               else "tempos reais do tempos.json")
@@ -148,6 +172,6 @@ def main(args):
     if falhas:
         pedir = " ".join(f"--linha {n}" for n in falhas)
         raise Erro(f"{len(falhas)} de {len(escolhidas)} cena(s) falharam, linha(s) {falhas}, com {origem}. "
-                   f"Corrija e rode: humanim animar roteiro.md {pedir}")
+                   f"Corrija e rode: humanim animar {relativo(pasta / 'roteiro.md')} {pedir}")
     ok(f"{len(escolhidas)} cena(s) pronta(s), {renderizadas} renderizada(s) e {len(escolhidas) - renderizadas} "
-       f"sem mudança, com {origem}. Confira com: humanim frames cenas/linha_NN.mp4")
+       f"sem mudança, com {origem}. Confira com: humanim frames {relativo(pasta / 'cenas')}/linha_NN.mp4")
