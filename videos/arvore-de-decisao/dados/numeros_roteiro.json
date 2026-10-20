@@ -1,0 +1,134 @@
+{
+ "base": {
+  "fala": "30 mil clientes; 22% deram calote no mês seguinte",
+  "n": 30000,
+  "calote": 6636,
+  "pct_calote": 22.12,
+  "nuvem_300_pontos": {
+   "verdes": 234,
+   "vermelhos": 66
+  }
+ },
+ "raiz": {
+  "fala": "iguais 0,78 x 0,78 + 0,22 x 0,22 = 0,66; diferentes 0,34",
+  "tela": "1 − (0,78² + 0,22²) = 1 − (0,61 + 0,05) = 1 − 0,66 = 0,34",
+  "gini": 0.3445,
+  "dois_clientes_diferentes_simulado": 0.34636,
+  "maximo_2_classes": 0.5
+ },
+ "vencedora": {
+  "fala": "quase 7 em 10 / 1 em 6 / só 10% / dá 0,29 / tirou 15%",
+  "sim": {
+   "n": 3130,
+   "pct_calote": 69.6,
+   "gini": 0.4235,
+   "nuvem_31_pontos": {
+    "vermelhos": 22,
+    "verdes": 9
+   }
+  },
+  "nao": {
+   "n": 26870,
+   "pct_calote": 16.6,
+   "gini": 0.2768,
+   "nuvem_269_pontos": {
+    "vermelhos": 44,
+    "verdes": 225
+   }
+  },
+  "tela": {
+   "gini_sim": "1 − (0,30² + 0,70²) = 1 − (0,09 + 0,49) = 1 − 0,58 = 0,42",
+   "gini_nao": "1 − (0,83² + 0,17²) = 1 − (0,69 + 0,03) = 1 − 0,72 = 0,28",
+   "ponderado": "0,10 × 0,42 + 0,90 × 0,28 = 0,04 + 0,25 = 0,29",
+   "ganho": "0,34 − 0,29 = 0,05"
+  },
+  "peso_sim": 0.1043,
+  "media_sem_peso": 0.3502,
+  "media_sem_peso_tela": "(0,42 + 0,28) ÷ 2 = 0,35",
+  "ponderado": 0.2921,
+  "pct_da_bagunca_tirada": 15.2,
+  "pct_tela": "0,05 ÷ 0,34 ≈ 15%"
+ },
+ "busca": {
+  "fala": "quase 175 mil cortes, em toda coluna",
+  "total": 174581,
+  "colunas": 23,
+  "cortes_atraso_6_colunas": 58,
+  "cortes_valores_em_NT$_13_colunas": 174458,
+  "cortes_resto": 65
+ },
+ "senso_comum": {
+  "fala": "idade e estado civil: em nenhum corte tiram nem 1%",
+  "idade": {
+   "melhor_corte": "AGE <= 25.5",
+   "pct_tirado": 0.18,
+   "tela": "0,2%",
+   "gini_ponderado_2_casas": 0.34
+  },
+  "estado_civil": {
+   "melhor_corte": "MARRIAGE <= 1.5",
+   "pct_tirado": 0.08,
+   "tela": "0,1%",
+   "gini_ponderado_2_casas": 0.34
+  },
+  "casado_igual_1_pct_tirado": 0.09,
+  "melhor_por_coluna_pct_tirado": {
+   "PAY_0": 15.21,
+   "PAY_2": 11.5,
+   "PAY_3": 8.62,
+   "PAY_4": 7.59,
+   "PAY_5": 7.13,
+   "PAY_6": 6.06,
+   "PAY_AMT1": 2.42,
+   "LIMIT_BAL": 2.29,
+   "PAY_AMT2": 1.71,
+   "PAY_AMT3": 1.51,
+   "PAY_AMT4": 1.27,
+   "PAY_AMT6": 1.13,
+   "PAY_AMT5": 1.01,
+   "EDUCATION": 0.27,
+   "AGE": 0.18,
+   "SEX": 0.16,
+   "BILL_AMT1": 0.1,
+   "MARRIAGE": 0.08,
+   "BILL_AMT2": 0.08,
+   "BILL_AMT3": 0.07,
+   "BILL_AMT5": 0.07,
+   "BILL_AMT6": 0.06,
+   "BILL_AMT4": 0.05
+  }
+ },
+ "corte": {
+  "fala": "cortar em um mês perde: os atrasados ficam meio a meio",
+  "um_mes": {
+   "n_sim": 6818,
+   "pct_calote_sim": 50.3,
+   "gini_sim": 0.5,
+   "gini_ponderado": 0.2979
+  },
+  "dois_meses": {
+   "gini_ponderado": 0.2921
+  }
+ },
+ "gulosa": {
+  "fala": "começar por um mês dava um tiquinho menos bagunça",
+  "gulosa": {
+   "raiz": "2+ meses? (PAY_0 <= 1.5)",
+   "lado_nao": "agosto 2+? (PAY_2 <= 1.5)",
+   "lado_sim": "julho? (PAY_3 <= -0.5; não descrever os códigos -2 e 0)",
+   "gini_nas_folhas": 0.281,
+   "acuracia_pct": 82.01
+  },
+  "comeca_por_1_mes": {
+   "raiz": "1+ mês? (PAY_0 <= 0.5)",
+   "lado_nao": "julho 2+? (PAY_3 <= 1.0)",
+   "lado_sim": "2+ meses? (PAY_0 <= 1.5)",
+   "gini_nas_folhas": 0.2808
+  },
+  "ressalvas": [
+   "menos bagunça nas folhas, não mais acerto: a de maior acerto (82,06%) tem a mesma raiz da gulosa",
+   "busca em 11 colunas (as 6 de atraso, sexo, escolaridade, estado civil, idade, limite)",
+   "diferença de 0,0002: dizer 'um tiquinho'"
+  ]
+ }
+}

@@ -81,6 +81,7 @@ A tela tem 8 unidades de largura por 14,22 de altura, origem no centro (x de -4 
 - Quando a linha N+1 continua a linha N, a cena N+1 começa redesenhando o estado final da N, sem animação (`self.add(...)`), para o corte não aparecer. Os dois estados saem de funções do `comum.py`, com posições fixas (números no `comum.py`, nunca dependentes de tempo). O que mudou com animação (um `DecimalNumber` depois de `set_value` fica 1 a 2 px fora) termina com `.become(...)` do mesmo objeto criado pelo `comum.py`.
 - [ANIM] seguida de [CANTO] que continua a cena: a [ANIM] já desenha dentro da área do CANTO (`AREA_CANTO`), senão você aparece por cima no corte. De [CANTO] para [ANIM], a cena pode crescer para a tela toda logo no começo.
 - Depois de uma linha [CARA], a cena pode começar do zero.
+- Vídeo dividido em blocos (skill `diretor`): o `comum.py` é do designer e vale para todos os blocos; o que é só de um bloco vai em `cenas/bloco_<n>.py` (`from comum import *` lá dentro, e `from bloco_<n> import *` nas cenas do bloco). Animador de bloco não mexe no `comum.py`: precisa mudar, avisa o diretor.
 - Pontos ou posições aleatórias: `rng = np.random.default_rng(7)` no `comum.py`, para todo render e toda linha verem os mesmos pontos.
 
 ## Conferir

@@ -14,7 +14,7 @@ from .formato import ALTURA, FPS, LARGURA
 from .roteiro import EDICAO, ler_roteiro, ler_tempos, quadros
 
 ESTILO = RAIZ / "estilo"
-# O que toda cena roda além dela e do comum.py: o estilo, o formato (o canto, a faixa de cima) e o ritmo da
+# O que toda cena roda além dela e dos ajudantes de cenas/: o estilo, o formato (o canto, a faixa de cima) e o ritmo da
 # fala (fala.py: quando cada palavra é dita, que o self.momento usa). Mudou, o clipe muda.
 DEPENDENCIAS = (ESTILO / "estilo.py", RAIZ / "humanim" / "formato.py", RAIZ / "humanim" / "fala.py")
 # Renders ao mesmo tempo: HUMANIM_PARALELO, ou o que a memória livre deixa (cada render de 1080x1920 passa de
@@ -42,10 +42,15 @@ def paralelo():
     return n, f"{livre:.1f} GB de memória livre"
 
 
+def ajudantes(cenas):
+    """Os módulos que as cenas importam (comum.py, bloco_2.py…): tudo em cenas/ que não é uma linha_NN.py."""
+    return sorted(p for p in cenas.glob("*.py") if not p.name.startswith("linha_")) or [cenas / "comum.py"]
+
+
 def assinatura(cena, linha):
-    """Muda quando muda algo que altera o clipe: a cena, cenas/comum.py, as DEPENDENCIAS, a marca ou a fala."""
+    """Muda quando muda algo que altera o clipe: a cena, os ajudantes de cenas/, as DEPENDENCIAS, a marca ou a fala."""
     h = hashlib.sha256()
-    for arq in (*DEPENDENCIAS, cena.parent / "comum.py", cena):
+    for arq in (*DEPENDENCIAS, *ajudantes(cena.parent), cena):
         h.update(arq.read_bytes() if arq.exists() else b"-")
     h.update(f"{linha.marca}|{linha.fala}|{os.environ.get('HUMANIM_DEPURAR', '')}".encode())
     return h.hexdigest()[:16]
@@ -70,7 +75,7 @@ def motivo_da_cena(pasta, linha, pede, feitas):
     if abs((tem := contar_quadros(clipe)) - pede) > 1:
         return f"a animação está desatualizada ({tem} quadros, a fala pede {pede})"
     if not cena.exists() or feitas.get(linha.cena) != {"hash": assinatura(cena, linha), "quadros": pede}:
-        return ("o clipe não é da cena atual: a cena, o comum.py, o estilo, o formato, o ritmo da fala ou a fala "
+        return ("o clipe não é da cena atual: a cena, o comum.py (ou outro ajudante de cenas/), o estilo, o formato, o ritmo da fala ou a fala "
                 "mudaram depois do último animar, ele falhou nesta linha, ou ela saiu com HUMANIM_DEPURAR")
     return ""
 

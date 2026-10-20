@@ -1,7 +1,24 @@
-videos/
 .venv/
 __pycache__/
 *.pyc
 media/
 modelos/
 *.egg-info/
+
+# Vídeos: o projeto de cada vídeo vai para o GitHub (roteiro, pesquisa, fontes, dados, cenas, tempos, edição).
+# Fica só no computador a mídia pesada, o que os comandos refazem e as pastas de teste.
+videos/.testes/
+videos/.workflows/
+videos/teste-*/
+videos/sim-*/
+videos/revisao-*/
+videos/correcoes-*/
+videos/*/.trabalho/
+videos/*/anteriores/
+videos/*/frames/
+videos/*/previa.html
+videos/*/*.webm
+videos/*/*.mp4
+videos/*/cenas/*.mp4
+videos/*/cenas/render.json
+videos/*/pesquisa/

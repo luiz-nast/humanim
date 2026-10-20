@@ -1,0 +1,1384 @@
+{
+  "dataset": {
+    "nome": "Default of Credit Card Clients (UCI id 350)",
+    "arquivo": "default_of_credit_card_clients.zip",
+    "sha256_zip": "56c885f84457f6680f8438f02bfcdac9579323d8a94465ee5f26e32baa727602",
+    "linhas": 30000,
+    "atributos": 23,
+    "alvo": "calote = 1 se o cliente deu calote no mês seguinte (coluna 'default payment next month'; documentação: default payment Yes = 1, No = 0)",
+    "codigos_nao_documentados": {
+      "nota": "A documentação do UCI define -1 (em dia) e 1..9 (meses de atraso) para PAY_*, mas os dados também têm -2 e 0, sem definição oficial. A pergunta vencedora (PAY_0 >= 2) usa só códigos documentados do lado 'sim'; -2 e 0 caem todos no lado 'não'.",
+      "PAY_0_igual_-2": 2759,
+      "PAY_0_igual_0": 14737
+    },
+    "versoes": {
+      "scikit-learn": "1.9.1",
+      "pandas": "3.0.6",
+      "numpy": "2.5.4"
+    }
+  },
+  "classes": {
+    "pagou": 23364,
+    "calote": 6636,
+    "pct_pagou": 77.88,
+    "pct_calote": 22.12
+  },
+  "gini_raiz": {
+    "n": 30000,
+    "pagou": 23364,
+    "calote": 6636,
+    "p_pagou": 0.7788,
+    "p_calote": 0.2212,
+    "p_pagou_ao_quadrado": 0.6065294400000001,
+    "p_calote_ao_quadrado": 0.048929440000000005,
+    "gini": 0.3445411199999999,
+    "conferencia_2p(1-p)": 0.34454112000000003,
+    "taxa_de_calote_pct": 22.12,
+    "um_em_cada": 4.520795660036167,
+    "conta": "p(pagou) = 23364 / 30000 ≈ 0,778800; p(calote) = 6636 / 30000 ≈ 0,221200; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,606529 + 0,048929) ≈ 0,344541",
+    "maximo_possivel_2_classes": 0.5,
+    "contas_de_tela": {
+      "2": {
+        "casas": 2,
+        "fecha": true,
+        "gini_tela": 0.34,
+        "conta": "1 − (0,78² + 0,22²) = 1 − (0,61 + 0,05) = 1 − 0,66 = 0,34"
+      },
+      "3": {
+        "casas": 3,
+        "fecha": false,
+        "gini_tela": 0.344,
+        "conta": "1 − (0,779² + 0,221²) = 1 − (0,607 + 0,049) = 1 − 0,656 = 0,344"
+      },
+      "4": {
+        "casas": 4,
+        "fecha": false,
+        "gini_tela": 0.3446,
+        "conta": "1 − (0,7788² + 0,2212²) = 1 − (0,6065 + 0,0489) = 1 − 0,6554 = 0,3446"
+      }
+    }
+  },
+  "perguntas_candidatas": [
+    {
+      "id": "atraso_2_meses",
+      "pergunta": "Está com 2 meses ou mais de atraso na fatura de setembro?",
+      "coluna": "PAY_0",
+      "regra": "PAY_0 >= 2",
+      "por_que_o_limiar": "Na documentação, 2 = atraso de dois meses. Para o scikit-learn é o corte PAY_0 <= 1,5.",
+      "sim": {
+        "n": 3130,
+        "pagou": 953,
+        "calote": 2177,
+        "p_pagou": 0.30447284345047926,
+        "p_calote": 0.6955271565495208,
+        "p_pagou_ao_quadrado": 0.09270371239882005,
+        "p_calote_ao_quadrado": 0.4837580254978616,
+        "gini": 0.42353826210331835,
+        "conferencia_2p(1-p)": 0.42353826210331846,
+        "taxa_de_calote_pct": 69.55271565495208,
+        "um_em_cada": 1.4377583830960037,
+        "conta": "p(pagou) = 953 / 3130 ≈ 0,304473; p(calote) = 2177 / 3130 ≈ 0,695527; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,092704 + 0,483758) ≈ 0,423538"
+      },
+      "nao": {
+        "n": 26870,
+        "pagou": 22411,
+        "calote": 4459,
+        "p_pagou": 0.83405284704131,
+        "p_calote": 0.16594715295868998,
+        "p_pagou_ao_quadrado": 0.6956441516577149,
+        "p_calote_ao_quadrado": 0.027538457575094846,
+        "gini": 0.27681739076719025,
+        "conferencia_2p(1-p)": 0.27681739076719025,
+        "taxa_de_calote_pct": 16.594715295868998,
+        "um_em_cada": 6.0260148015250055,
+        "conta": "p(pagou) = 22411 / 26870 ≈ 0,834053; p(calote) = 4459 / 26870 ≈ 0,165947; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,695644 + 0,027538) ≈ 0,276817"
+      },
+      "peso_sim": 0.10433333333333333,
+      "peso_nao": 0.8956666666666667,
+      "gini_ponderado": 0.29212526834325964,
+      "ganho": 0.05241585165674029,
+      "ganho_pct_da_raiz": 15.213235406194855,
+      "conta_ponderado": "(3130/30000) × Gini(sim) + (26870/30000) × Gini(não) ≈ 0,104333 × 0,423538 + 0,895667 × 0,276817 ≈ 0,044189 + 0,247936 ≈ 0,292125",
+      "conta_ganho": "Gini(raiz) − ponderado ≈ 0,344541 − 0,292125 ≈ 0,052416",
+      "contas_de_tela": {
+        "2": {
+          "casas": 2,
+          "fecha": true,
+          "gini_sim": "1 − (0,30² + 0,70²) = 1 − (0,09 + 0,49) = 1 − 0,58 = 0,42",
+          "gini_nao": "1 − (0,83² + 0,17²) = 1 − (0,69 + 0,03) = 1 − 0,72 = 0,28",
+          "ponderado": "0,10 × 0,42 + 0,90 × 0,28 = 0,04 + 0,25 = 0,29",
+          "ganho": "0,34 − 0,29 = 0,05"
+        },
+        "3": {
+          "casas": 3,
+          "fecha": false,
+          "gini_sim": "1 − (0,304² + 0,696²) = 1 − (0,092 + 0,484) = 1 − 0,576 = 0,424",
+          "gini_nao": "1 − (0,834² + 0,166²) = 1 − (0,696 + 0,028) = 1 − 0,724 = 0,276",
+          "ponderado": "0,104 × 0,424 + 0,896 × 0,276 = 0,044 + 0,247 = 0,291",
+          "ganho": "0,344 − 0,291 = 0,053"
+        },
+        "4": {
+          "casas": 4,
+          "fecha": false,
+          "gini_sim": "1 − (0,3045² + 0,6955²) = 1 − (0,0927 + 0,4837) = 1 − 0,5764 = 0,4236",
+          "gini_nao": "1 − (0,8341² + 0,1659²) = 1 − (0,6957 + 0,0275) = 1 − 0,7232 = 0,2768",
+          "ponderado": "0,1043 × 0,4236 + 0,8957 × 0,2768 = 0,0442 + 0,2479 = 0,2921",
+          "ganho": "0,3446 − 0,2921 = 0,0525"
+        }
+      },
+      "casas_que_fecham_na_tela": [
+        2
+      ],
+      "conferido_sklearn": true,
+      "posicao": 1
+    },
+    {
+      "id": "qualquer_atraso",
+      "pergunta": "Está com algum atraso (1 mês ou mais) na fatura de setembro?",
+      "coluna": "PAY_0",
+      "regra": "PAY_0 >= 1",
+      "por_que_o_limiar": "Mesma coluna, limiar um degrau abaixo: 1 = atraso de um mês. Mostra que o limiar importa.",
+      "sim": {
+        "n": 6818,
+        "pagou": 3389,
+        "calote": 3429,
+        "p_pagou": 0.49706658844235846,
+        "p_calote": 0.5029334115576415,
+        "p_pagou_ao_quadrado": 0.24707519334572497,
+        "p_calote_ao_quadrado": 0.252942016461008,
+        "gini": 0.49998279019326697,
+        "conferencia_2p(1-p)": 0.4999827901932669,
+        "taxa_de_calote_pct": 50.293341155764146,
+        "um_em_cada": 1.9883347914843978,
+        "conta": "p(pagou) = 3389 / 6818 ≈ 0,497067; p(calote) = 3429 / 6818 ≈ 0,502933; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,247075 + 0,252942) ≈ 0,499983"
+      },
+      "nao": {
+        "n": 23182,
+        "pagou": 19975,
+        "calote": 3207,
+        "p_pagou": 0.8616599085497368,
+        "p_calote": 0.13834009145026313,
+        "p_pagou_ao_quadrado": 0.7424577980019409,
+        "p_calote_ao_quadrado": 0.019137980902467166,
+        "gini": 0.2384042210955919,
+        "conferencia_2p(1-p)": 0.23840422109559192,
+        "taxa_de_calote_pct": 13.834009145026313,
+        "um_em_cada": 7.2285625194886185,
+        "conta": "p(pagou) = 19975 / 23182 ≈ 0,861660; p(calote) = 3207 / 23182 ≈ 0,138340; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,742458 + 0,019138) ≈ 0,238404"
+      },
+      "peso_sim": 0.22726666666666667,
+      "peso_nao": 0.7727333333333334,
+      "gini_ponderado": 0.29785231056585687,
+      "ganho": 0.04668880943414305,
+      "ganho_pct_da_raiz": 13.551012266443863,
+      "conta_ponderado": "(6818/30000) × Gini(sim) + (23182/30000) × Gini(não) ≈ 0,227267 × 0,499983 + 0,772733 × 0,238404 ≈ 0,113629 + 0,184223 ≈ 0,297852",
+      "conta_ganho": "Gini(raiz) − ponderado ≈ 0,344541 − 0,297852 ≈ 0,046689",
+      "contas_de_tela": {
+        "2": {
+          "casas": 2,
+          "fecha": false,
+          "gini_sim": "1 − (0,50² + 0,50²) = 1 − (0,25 + 0,25) = 1 − 0,50 = 0,50",
+          "gini_nao": "1 − (0,86² + 0,14²) = 1 − (0,74 + 0,02) = 1 − 0,76 = 0,24",
+          "ponderado": "0,23 × 0,50 + 0,77 × 0,24 = 0,12 + 0,18 = 0,30",
+          "ganho": "0,34 − 0,30 = 0,04"
+        },
+        "3": {
+          "casas": 3,
+          "fecha": false,
+          "gini_sim": "1 − (0,497² + 0,503²) = 1 − (0,247 + 0,253) = 1 − 0,500 = 0,500",
+          "gini_nao": "1 − (0,862² + 0,138²) = 1 − (0,743 + 0,019) = 1 − 0,762 = 0,238",
+          "ponderado": "0,227 × 0,500 + 0,773 × 0,238 = 0,114 + 0,184 = 0,298",
+          "ganho": "0,344 − 0,298 = 0,046"
+        },
+        "4": {
+          "casas": 4,
+          "fecha": true,
+          "gini_sim": "1 − (0,4971² + 0,5029²) = 1 − (0,2471 + 0,2529) = 1 − 0,5000 = 0,5000",
+          "gini_nao": "1 − (0,8617² + 0,1383²) = 1 − (0,7425 + 0,0191) = 1 − 0,7616 = 0,2384",
+          "ponderado": "0,2273 × 0,5000 + 0,7727 × 0,2384 = 0,1137 + 0,1842 = 0,2979",
+          "ganho": "0,3446 − 0,2979 = 0,0467"
+        }
+      },
+      "casas_que_fecham_na_tela": [],
+      "conferido_sklearn": true,
+      "posicao": 2
+    },
+    {
+      "id": "pagou_zero",
+      "pergunta": "Pagou zero no mês de setembro?",
+      "coluna": "PAY_AMT1",
+      "regra": "PAY_AMT1 == 0",
+      "por_que_o_limiar": "Zero é o limiar mais simples: pagou alguma coisa ou não pagou nada.",
+      "sim": {
+        "n": 5249,
+        "pagou": 3362,
+        "calote": 1887,
+        "p_pagou": 0.6405029529434177,
+        "p_calote": 0.3594970470565822,
+        "p_pagou_ao_quadrado": 0.410244032729238,
+        "p_calote_ao_quadrado": 0.12923812684240246,
+        "gini": 0.4605178404283595,
+        "conferencia_2p(1-p)": 0.4605178404283594,
+        "taxa_de_calote_pct": 35.94970470565822,
+        "um_em_cada": 2.7816640169581346,
+        "conta": "p(pagou) = 3362 / 5249 ≈ 0,640503; p(calote) = 1887 / 5249 ≈ 0,359497; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,410244 + 0,129238) ≈ 0,460518"
+      },
+      "nao": {
+        "n": 24751,
+        "pagou": 20002,
+        "calote": 4749,
+        "p_pagou": 0.8081289644862834,
+        "p_calote": 0.19187103551371662,
+        "p_pagou_ao_quadrado": 0.6530724232416726,
+        "p_calote_ao_quadrado": 0.03681449426910591,
+        "gini": 0.31011308248922154,
+        "conferencia_2p(1-p)": 0.3101130824892214,
+        "taxa_de_calote_pct": 19.187103551371663,
+        "um_em_cada": 5.211834070330596,
+        "conta": "p(pagou) = 20002 / 24751 ≈ 0,808129; p(calote) = 4749 / 24751 ≈ 0,191871; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,653072 + 0,036814) ≈ 0,310113"
+      },
+      "peso_sim": 0.17496666666666666,
+      "peso_nao": 0.8250333333333333,
+      "gini_ponderado": 0.33642890163663935,
+      "ganho": 0.008112218363360568,
+      "ganho_pct_da_raiz": 2.354499330402296,
+      "conta_ponderado": "(5249/30000) × Gini(sim) + (24751/30000) × Gini(não) ≈ 0,174967 × 0,460518 + 0,825033 × 0,310113 ≈ 0,080575 + 0,255854 ≈ 0,336429",
+      "conta_ganho": "Gini(raiz) − ponderado ≈ 0,344541 − 0,336429 ≈ 0,008112",
+      "contas_de_tela": {
+        "2": {
+          "casas": 2,
+          "fecha": false,
+          "gini_sim": "1 − (0,64² + 0,36²) = 1 − (0,41 + 0,13) = 1 − 0,54 = 0,46",
+          "gini_nao": "1 − (0,81² + 0,19²) = 1 − (0,66 + 0,04) = 1 − 0,70 = 0,30",
+          "ponderado": "0,17 × 0,46 + 0,83 × 0,30 = 0,08 + 0,25 = 0,33",
+          "ganho": "0,34 − 0,33 = 0,01"
+        },
+        "3": {
+          "casas": 3,
+          "fecha": false,
+          "gini_sim": "1 − (0,641² + 0,359²) = 1 − (0,411 + 0,129) = 1 − 0,540 = 0,460",
+          "gini_nao": "1 − (0,808² + 0,192²) = 1 − (0,653 + 0,037) = 1 − 0,690 = 0,310",
+          "ponderado": "0,175 × 0,460 + 0,825 × 0,310 = 0,081 + 0,256 = 0,337",
+          "ganho": "0,344 − 0,337 = 0,007"
+        },
+        "4": {
+          "casas": 4,
+          "fecha": false,
+          "gini_sim": "1 − (0,6405² + 0,3595²) = 1 − (0,4102 + 0,1292) = 1 − 0,5394 = 0,4606",
+          "gini_nao": "1 − (0,8081² + 0,1919²) = 1 − (0,6530 + 0,0368) = 1 − 0,6898 = 0,3102",
+          "ponderado": "0,1750 × 0,4606 + 0,8250 × 0,3102 = 0,0806 + 0,2559 = 0,3365",
+          "ganho": "0,3446 − 0,3365 = 0,0081"
+        }
+      },
+      "casas_que_fecham_na_tela": [],
+      "conferido_sklearn": true,
+      "posicao": 3
+    },
+    {
+      "id": "limite_baixo",
+      "pergunta": "O limite do cartão é de até NT$ 50 mil?",
+      "coluna": "LIMIT_BAL",
+      "regra": "LIMIT_BAL <= 50000",
+      "por_que_o_limiar": "NT$ 50 mil é o quartil de baixo: cerca de 1 em cada 4 clientes tem limite até aí.",
+      "sim": {
+        "n": 7676,
+        "pagou": 5236,
+        "calote": 2440,
+        "p_pagou": 0.6821261073475768,
+        "p_calote": 0.31787389265242316,
+        "p_pagou_ao_quadrado": 0.46529602632515793,
+        "p_calote_ao_quadrado": 0.10104381163000424,
+        "gini": 0.4336601620448378,
+        "conferencia_2p(1-p)": 0.4336601620448378,
+        "taxa_de_calote_pct": 31.787389265242318,
+        "um_em_cada": 3.1459016393442623,
+        "conta": "p(pagou) = 5236 / 7676 ≈ 0,682126; p(calote) = 2440 / 7676 ≈ 0,317874; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,465296 + 0,101044) ≈ 0,433660"
+      },
+      "nao": {
+        "n": 22324,
+        "pagou": 18128,
+        "calote": 4196,
+        "p_pagou": 0.8120408528937466,
+        "p_calote": 0.18795914710625336,
+        "p_pagou_ao_quadrado": 0.6594103467684034,
+        "p_calote_ao_quadrado": 0.03532864098091019,
+        "gini": 0.30526101225068647,
+        "conferencia_2p(1-p)": 0.3052610122506863,
+        "taxa_de_calote_pct": 18.795914710625336,
+        "um_em_cada": 5.320305052430887,
+        "conta": "p(pagou) = 18128 / 22324 ≈ 0,812041; p(calote) = 4196 / 22324 ≈ 0,187959; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,659410 + 0,035329) ≈ 0,305261"
+      },
+      "peso_sim": 0.2558666666666667,
+      "peso_nao": 0.7441333333333333,
+      "gini_ponderado": 0.33811407471135,
+      "ganho": 0.006427045288649902,
+      "ganho_pct_da_raiz": 1.865392812518257,
+      "conta_ponderado": "(7676/30000) × Gini(sim) + (22324/30000) × Gini(não) ≈ 0,255867 × 0,433660 + 0,744133 × 0,305261 ≈ 0,110959 + 0,227155 ≈ 0,338114",
+      "conta_ganho": "Gini(raiz) − ponderado ≈ 0,344541 − 0,338114 ≈ 0,006427",
+      "contas_de_tela": {
+        "2": {
+          "casas": 2,
+          "fecha": false,
+          "gini_sim": "1 − (0,68² + 0,32²) = 1 − (0,46 + 0,10) = 1 − 0,56 = 0,44",
+          "gini_nao": "1 − (0,81² + 0,19²) = 1 − (0,66 + 0,04) = 1 − 0,70 = 0,30",
+          "ponderado": "0,26 × 0,44 + 0,74 × 0,30 = 0,11 + 0,22 = 0,33",
+          "ganho": "0,34 − 0,33 = 0,01"
+        },
+        "3": {
+          "casas": 3,
+          "fecha": false,
+          "gini_sim": "1 − (0,682² + 0,318²) = 1 − (0,465 + 0,101) = 1 − 0,566 = 0,434",
+          "gini_nao": "1 − (0,812² + 0,188²) = 1 − (0,659 + 0,035) = 1 − 0,694 = 0,306",
+          "ponderado": "0,256 × 0,434 + 0,744 × 0,306 = 0,111 + 0,228 = 0,339",
+          "ganho": "0,344 − 0,339 = 0,005"
+        },
+        "4": {
+          "casas": 4,
+          "fecha": false,
+          "gini_sim": "1 − (0,6821² + 0,3179²) = 1 − (0,4653 + 0,1011) = 1 − 0,5664 = 0,4336",
+          "gini_nao": "1 − (0,8120² + 0,1880²) = 1 − (0,6593 + 0,0353) = 1 − 0,6946 = 0,3054",
+          "ponderado": "0,2559 × 0,4336 + 0,7441 × 0,3054 = 0,1110 + 0,2272 = 0,3382",
+          "ganho": "0,3446 − 0,3382 = 0,0064"
+        }
+      },
+      "casas_que_fecham_na_tela": [],
+      "conferido_sklearn": true,
+      "posicao": 4
+    },
+    {
+      "id": "casado",
+      "pergunta": "É casado(a)?",
+      "coluna": "MARRIAGE",
+      "regra": "MARRIAGE == 1",
+      "por_que_o_limiar": "Intuição de senso comum (casado é mais estável?). 1 = casado na documentação.",
+      "sim": {
+        "n": 13659,
+        "pagou": 10453,
+        "calote": 3206,
+        "p_pagou": 0.7652829636137345,
+        "p_calote": 0.23471703638626545,
+        "p_pagou_ao_quadrado": 0.5856580143974205,
+        "p_calote_ao_quadrado": 0.05509208716995146,
+        "gini": 0.359249898432628,
+        "conferencia_2p(1-p)": 0.35924989843262795,
+        "taxa_de_calote_pct": 23.471703638626547,
+        "um_em_cada": 4.26044915782907,
+        "conta": "p(pagou) = 10453 / 13659 ≈ 0,765283; p(calote) = 3206 / 13659 ≈ 0,234717; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,585658 + 0,055092) ≈ 0,359250"
+      },
+      "nao": {
+        "n": 16341,
+        "pagou": 12911,
+        "calote": 3430,
+        "p_pagou": 0.7900985251820574,
+        "p_calote": 0.2099014748179426,
+        "p_pagou_ao_quadrado": 0.6242556794948622,
+        "p_calote_ao_quadrado": 0.044058629130747394,
+        "gini": 0.3316856913743904,
+        "conferencia_2p(1-p)": 0.3316856913743904,
+        "taxa_de_calote_pct": 20.99014748179426,
+        "um_em_cada": 4.764139941690962,
+        "conta": "p(pagou) = 12911 / 16341 ≈ 0,790099; p(calote) = 3430 / 16341 ≈ 0,209901; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,624256 + 0,044059) ≈ 0,331686"
+      },
+      "peso_sim": 0.4553,
+      "peso_nao": 0.5447,
+      "gini_ponderado": 0.344235674848006,
+      "ganho": 0.00030544515199393274,
+      "ganho_pct_da_raiz": 0.08865274252139566,
+      "conta_ponderado": "(13659/30000) × Gini(sim) + (16341/30000) × Gini(não) ≈ 0,455300 × 0,359250 + 0,544700 × 0,331686 ≈ 0,163566 + 0,180669 ≈ 0,344236",
+      "conta_ganho": "Gini(raiz) − ponderado ≈ 0,344541 − 0,344236 ≈ 0,000305",
+      "contas_de_tela": {
+        "2": {
+          "casas": 2,
+          "fecha": false,
+          "gini_sim": "1 − (0,77² + 0,23²) = 1 − (0,59 + 0,05) = 1 − 0,64 = 0,36",
+          "gini_nao": "1 − (0,79² + 0,21²) = 1 − (0,62 + 0,04) = 1 − 0,66 = 0,34",
+          "ponderado": "0,46 × 0,36 + 0,54 × 0,34 = 0,17 + 0,18 = 0,35",
+          "ganho": "0,34 − 0,35 = -0,01"
+        },
+        "3": {
+          "casas": 3,
+          "fecha": false,
+          "gini_sim": "1 − (0,765² + 0,235²) = 1 − (0,585 + 0,055) = 1 − 0,640 = 0,360",
+          "gini_nao": "1 − (0,790² + 0,210²) = 1 − (0,624 + 0,044) = 1 − 0,668 = 0,332",
+          "ponderado": "0,455 × 0,360 + 0,545 × 0,332 = 0,164 + 0,181 = 0,345",
+          "ganho": "0,344 − 0,345 = -0,001"
+        },
+        "4": {
+          "casas": 4,
+          "fecha": false,
+          "gini_sim": "1 − (0,7653² + 0,2347²) = 1 − (0,5857 + 0,0551) = 1 − 0,6408 = 0,3592",
+          "gini_nao": "1 − (0,7901² + 0,2099²) = 1 − (0,6243 + 0,0441) = 1 − 0,6684 = 0,3316",
+          "ponderado": "0,4553 × 0,3592 + 0,5447 × 0,3316 = 0,1635 + 0,1806 = 0,3441",
+          "ganho": "0,3446 − 0,3441 = 0,0005"
+        }
+      },
+      "casas_que_fecham_na_tela": [],
+      "conferido_sklearn": true,
+      "posicao": 5
+    },
+    {
+      "id": "menos_de_30",
+      "pergunta": "Tem menos de 30 anos?",
+      "coluna": "AGE",
+      "regra": "AGE < 30",
+      "por_que_o_limiar": "Intuição de senso comum (jovem paga pior?), limiar redondo.",
+      "sim": {
+        "n": 9618,
+        "pagou": 7421,
+        "calote": 2197,
+        "p_pagou": 0.7715741318361405,
+        "p_calote": 0.22842586816385943,
+        "p_pagou_ao_quadrado": 0.595326640918694,
+        "p_calote_ao_quadrado": 0.05217837724641289,
+        "gini": 0.35249498183489303,
+        "conferencia_2p(1-p)": 0.3524949818348931,
+        "taxa_de_calote_pct": 22.842586816385943,
+        "um_em_cada": 4.377787892580792,
+        "conta": "p(pagou) = 7421 / 9618 ≈ 0,771574; p(calote) = 2197 / 9618 ≈ 0,228426; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,595327 + 0,052178) ≈ 0,352495"
+      },
+      "nao": {
+        "n": 20382,
+        "pagou": 15943,
+        "calote": 4439,
+        "p_pagou": 0.7822097929545677,
+        "p_calote": 0.21779020704543225,
+        "p_pagou_ao_quadrado": 0.6118521601940277,
+        "p_calote_ao_quadrado": 0.04743257428489225,
+        "gini": 0.3407152655210801,
+        "conferencia_2p(1-p)": 0.34071526552108,
+        "taxa_de_calote_pct": 21.779020704543225,
+        "um_em_cada": 4.591574678981753,
+        "conta": "p(pagou) = 15943 / 20382 ≈ 0,782210; p(calote) = 4439 / 20382 ≈ 0,217790; Gini = 1 − (p(pagou)² + p(calote)²) ≈ 1 − (0,611852 + 0,047433) ≈ 0,340715"
+      },
+      "peso_sim": 0.3206,
+      "peso_nao": 0.6794,
+      "gini_ponderado": 0.3444918425712885,
+      "ganho": 4.927742871141394e-05,
+      "ganho_pct_da_raiz": 0.014302336020563801,
+      "conta_ponderado": "(9618/30000) × Gini(sim) + (20382/30000) × Gini(não) ≈ 0,320600 × 0,352495 + 0,679400 × 0,340715 ≈ 0,113010 + 0,231482 ≈ 0,344492",
+      "conta_ganho": "Gini(raiz) − ponderado ≈ 0,344541 − 0,344492 ≈ 0,000049",
+      "contas_de_tela": {
+        "2": {
+          "casas": 2,
+          "fecha": false,
+          "gini_sim": "1 − (0,77² + 0,23²) = 1 − (0,59 + 0,05) = 1 − 0,64 = 0,36",
+          "gini_nao": "1 − (0,78² + 0,22²) = 1 − (0,61 + 0,05) = 1 − 0,66 = 0,34",
+          "ponderado": "0,32 × 0,36 + 0,68 × 0,34 = 0,12 + 0,23 = 0,35",
+          "ganho": "0,34 − 0,35 = -0,01"
+        },
+        "3": {
+          "casas": 3,
+          "fecha": false,
+          "gini_sim": "1 − (0,772² + 0,228²) = 1 − (0,596 + 0,052) = 1 − 0,648 = 0,352",
+          "gini_nao": "1 − (0,782² + 0,218²) = 1 − (0,612 + 0,048) = 1 − 0,660 = 0,340",
+          "ponderado": "0,321 × 0,352 + 0,679 × 0,340 = 0,113 + 0,231 = 0,344",
+          "ganho": "0,344 − 0,344 = 0,000"
+        },
+        "4": {
+          "casas": 4,
+          "fecha": false,
+          "gini_sim": "1 − (0,7716² + 0,2284²) = 1 − (0,5954 + 0,0522) = 1 − 0,6476 = 0,3524",
+          "gini_nao": "1 − (0,7822² + 0,2178²) = 1 − (0,6118 + 0,0474) = 1 − 0,6592 = 0,3408",
+          "ponderado": "0,3206 × 0,3524 + 0,6794 × 0,3408 = 0,1130 + 0,2315 = 0,3445",
+          "ganho": "0,3446 − 0,3445 = 0,0001"
+        }
+      },
+      "casas_que_fecham_na_tela": [],
+      "conferido_sklearn": true,
+      "posicao": 6
+    }
+  ],
+  "vencedora": {
+    "id": "atraso_2_meses",
+    "pergunta": "Está com 2 meses ou mais de atraso na fatura de setembro?",
+    "regra": "PAY_0 >= 2",
+    "ganho": 0.05241585165674029,
+    "segunda": "qualquer_atraso",
+    "ganho_segunda": 0.04668880943414305,
+    "diferenca_para_segunda": 0.005727042222597234,
+    "vezes_a_segunda": 1.1226641306987175,
+    "melhor_de_outra_coluna": "pagou_zero",
+    "ganho_melhor_de_outra_coluna": 0.008112218363360568,
+    "vezes_a_melhor_de_outra_coluna": 6.461346244509436,
+    "pior": "menos_de_30",
+    "ganho_pior": 4.927742871141394e-05,
+    "vezes_a_pior": 1063.6888536474999,
+    "gini_cai_de_para": [
+      0.3445411199999999,
+      0.29212526834325964
+    ],
+    "pct_da_impureza_da_raiz_removida": 15.213235406194855
+  },
+  "para_tela": {
+    "regra": "Conta passo a passo com 2 casas (ela fecha: cada passo é conta dos números mostrados e o final bate com o valor verdadeiro arredondado). Para comparar perguntas, mostre o Gini ponderado (o menor vence) com 2 ou 4 casas, ou a bagunça removida em %; não mostre o ganho das outras perguntas com 2 casas (0,34 − 0,30 daria 0,04, mas o ganho real da 2ª pergunta arredonda para 0,05). Não mostre o Gini da raiz com 3 casas junto com 2 casas: 0,34454 vira 0,345 com 3 casas, que parece arredondar para 0,35, mas com 2 casas o certo é 0,34.",
+    "raiz_2_casas": "1 − (0,78² + 0,22²) = 1 − (0,61 + 0,05) = 1 − 0,66 = 0,34",
+    "vencedora_2_casas": {
+      "gini_sim": "1 − (0,30² + 0,70²) = 1 − (0,09 + 0,49) = 1 − 0,58 = 0,42",
+      "gini_nao": "1 − (0,83² + 0,17²) = 1 − (0,69 + 0,03) = 1 − 0,72 = 0,28",
+      "ponderado": "0,10 × 0,42 + 0,90 × 0,28 = 0,04 + 0,25 = 0,29",
+      "ganho": "0,34 − 0,29 = 0,05"
+    },
+    "raiz_4_casas": 0.3445,
+    "ranking": [
+      {
+        "pergunta": "Está com 2 meses ou mais de atraso na fatura de setembro?",
+        "regra": "PAY_0 >= 2",
+        "calote_sim_pct_1_casa": 69.6,
+        "calote_nao_pct_1_casa": 16.6,
+        "gini_ponderado_2_casas": 0.29,
+        "gini_ponderado_4_casas": 0.2921,
+        "ganho_4_casas": 0.0524,
+        "bagunca_removida_pct_1_casa": 15.2
+      },
+      {
+        "pergunta": "Está com algum atraso (1 mês ou mais) na fatura de setembro?",
+        "regra": "PAY_0 >= 1",
+        "calote_sim_pct_1_casa": 50.3,
+        "calote_nao_pct_1_casa": 13.8,
+        "gini_ponderado_2_casas": 0.3,
+        "gini_ponderado_4_casas": 0.2979,
+        "ganho_4_casas": 0.0467,
+        "bagunca_removida_pct_1_casa": 13.6
+      },
+      {
+        "pergunta": "Pagou zero no mês de setembro?",
+        "regra": "PAY_AMT1 == 0",
+        "calote_sim_pct_1_casa": 35.9,
+        "calote_nao_pct_1_casa": 19.2,
+        "gini_ponderado_2_casas": 0.34,
+        "gini_ponderado_4_casas": 0.3364,
+        "ganho_4_casas": 0.0081,
+        "bagunca_removida_pct_1_casa": 2.4
+      },
+      {
+        "pergunta": "O limite do cartão é de até NT$ 50 mil?",
+        "regra": "LIMIT_BAL <= 50000",
+        "calote_sim_pct_1_casa": 31.8,
+        "calote_nao_pct_1_casa": 18.8,
+        "gini_ponderado_2_casas": 0.34,
+        "gini_ponderado_4_casas": 0.3381,
+        "ganho_4_casas": 0.0064,
+        "bagunca_removida_pct_1_casa": 1.9
+      },
+      {
+        "pergunta": "É casado(a)?",
+        "regra": "MARRIAGE == 1",
+        "calote_sim_pct_1_casa": 23.5,
+        "calote_nao_pct_1_casa": 21.0,
+        "gini_ponderado_2_casas": 0.34,
+        "gini_ponderado_4_casas": 0.3442,
+        "ganho_4_casas": 0.0003,
+        "bagunca_removida_pct_1_casa": 0.1
+      },
+      {
+        "pergunta": "Tem menos de 30 anos?",
+        "regra": "AGE < 30",
+        "calote_sim_pct_1_casa": 22.8,
+        "calote_nao_pct_1_casa": 21.8,
+        "gini_ponderado_2_casas": 0.34,
+        "gini_ponderado_4_casas": 0.3445,
+        "ganho_4_casas": 0.0,
+        "bagunca_removida_pct_1_casa": 0.0
+      }
+    ],
+    "em_palavras": {
+      "raiz": "6636 de 30000 deram calote: 22,12%, mais de 1 em cada 5",
+      "vencedora_sim": "2177 de 3130 deram calote: 69,6%, cerca de 7 em cada 10",
+      "vencedora_nao": "4459 de 26870 deram calote: 16,6%, cerca de 1 em cada 6"
+    }
+  },
+  "busca_exaustiva_raiz": {
+    "explicacao": "Para cada uma das 23 colunas, testa todo corte 'coluna <= limiar' entre dois valores vizinhos e guarda o de menor Gini ponderado.",
+    "total_de_perguntas_testadas": 174581,
+    "melhor_por_coluna": [
+      {
+        "coluna": "PAY_0",
+        "nome": "situação da fatura de setembro/2005 (-1 em dia; 1 = 1 mês de atraso; 2 = 2 meses...)",
+        "melhor_limiar": 1.5,
+        "ganho": 0.05241585165674034,
+        "limiares_testados": 10
+      },
+      {
+        "coluna": "PAY_2",
+        "nome": "situação da fatura de agosto/2005",
+        "melhor_limiar": 1.5,
+        "ganho": 0.03963680147279747,
+        "limiares_testados": 10
+      },
+      {
+        "coluna": "PAY_3",
+        "nome": "situação da fatura de julho/2005",
+        "melhor_limiar": 1.5,
+        "ganho": 0.029714557353515192,
+        "limiares_testados": 10
+      },
+      {
+        "coluna": "PAY_4",
+        "nome": "situação da fatura de junho/2005",
+        "melhor_limiar": 0.5,
+        "ganho": 0.026149744143497633,
+        "limiares_testados": 10
+      },
+      {
+        "coluna": "PAY_5",
+        "nome": "situação da fatura de maio/2005",
+        "melhor_limiar": 1.0,
+        "ganho": 0.02455444078024327,
+        "limiares_testados": 9
+      },
+      {
+        "coluna": "PAY_6",
+        "nome": "situação da fatura de abril/2005",
+        "melhor_limiar": 1.0,
+        "ganho": 0.02086532493344656,
+        "limiares_testados": 9
+      },
+      {
+        "coluna": "PAY_AMT1",
+        "nome": "valor pago em setembro/2005 (NT$)",
+        "melhor_limiar": 21.5,
+        "ganho": 0.008344980645128619,
+        "limiares_testados": 7942
+      },
+      {
+        "coluna": "LIMIT_BAL",
+        "nome": "limite do cartão (NT$, inclui cartões adicionais da família)",
+        "melhor_limiar": 125000.0,
+        "ganho": 0.007900194846802544,
+        "limiares_testados": 80
+      },
+      {
+        "coluna": "PAY_AMT2",
+        "nome": "valor pago em agosto/2005 (NT$)",
+        "melhor_limiar": 91.0,
+        "ganho": 0.0059034604555890935,
+        "limiares_testados": 7898
+      },
+      {
+        "coluna": "PAY_AMT3",
+        "nome": "valor pago em julho/2005 (NT$)",
+        "melhor_limiar": 1.5,
+        "ganho": 0.005214444979258492,
+        "limiares_testados": 7517
+      },
+      {
+        "coluna": "PAY_AMT4",
+        "nome": "valor pago em junho/2005 (NT$)",
+        "melhor_limiar": 0.5,
+        "ganho": 0.004382374150351975,
+        "limiares_testados": 6936
+      },
+      {
+        "coluna": "PAY_AMT6",
+        "nome": "valor pago em abril/2005 (NT$)",
+        "melhor_limiar": 2000.5,
+        "ganho": 0.0038937730693911488,
+        "limiares_testados": 6938
+      },
+      {
+        "coluna": "PAY_AMT5",
+        "nome": "valor pago em maio/2005 (NT$)",
+        "melhor_limiar": 1935.5,
+        "ganho": 0.0034819308561140905,
+        "limiares_testados": 6896
+      },
+      {
+        "coluna": "EDUCATION",
+        "nome": "escolaridade",
+        "melhor_limiar": 1.5,
+        "ganho": 0.0009256524308009495,
+        "limiares_testados": 6
+      },
+      {
+        "coluna": "AGE",
+        "nome": "idade (anos)",
+        "melhor_limiar": 25.5,
+        "ganho": 0.0006106601476602025,
+        "limiares_testados": 55
+      },
+      {
+        "coluna": "SEX",
+        "nome": "sexo",
+        "melhor_limiar": 1.5,
+        "ganho": 0.0005501797193356861,
+        "limiares_testados": 1
+      },
+      {
+        "coluna": "BILL_AMT1",
+        "nome": "valor da fatura de setembro/2005 (NT$)",
+        "melhor_limiar": 54406.0,
+        "ganho": 0.0003497024788974845,
+        "limiares_testados": 22722
+      },
+      {
+        "coluna": "MARRIAGE",
+        "nome": "estado civil",
+        "melhor_limiar": 1.5,
+        "ganho": 0.0002827190178828487,
+        "limiares_testados": 3
+      },
+      {
+        "coluna": "BILL_AMT2",
+        "nome": "valor da fatura de agosto/2005 (NT$)",
+        "melhor_limiar": 92368.5,
+        "ganho": 0.00027650478768803666,
+        "limiares_testados": 22345
+      },
+      {
+        "coluna": "BILL_AMT3",
+        "nome": "valor da fatura de julho/2005 (NT$)",
+        "melhor_limiar": 50618.0,
+        "ganho": 0.00023163810934162532,
+        "limiares_testados": 22025
+      },
+      {
+        "coluna": "BILL_AMT5",
+        "nome": "valor da fatura de maio/2005 (NT$)",
+        "melhor_limiar": 51044.5,
+        "ganho": 0.00022841073060414496,
+        "limiares_testados": 21009
+      },
+      {
+        "coluna": "BILL_AMT6",
+        "nome": "valor da fatura de abril/2005 (NT$)",
+        "melhor_limiar": 12657.0,
+        "ganho": 0.0002048579035244802,
+        "limiares_testados": 20603
+      },
+      {
+        "coluna": "BILL_AMT4",
+        "nome": "valor da fatura de junho/2005 (NT$)",
+        "melhor_limiar": 79184.0,
+        "ganho": 0.00018629141167475494,
+        "limiares_testados": 21547
+      }
+    ]
+  },
+  "varredura_PAY_0": [
+    {
+      "pergunta": "PAY_0 >= -1",
+      "limiar_sklearn": "PAY_0 <= -1.5",
+      "n_sim": 27241,
+      "taxa_calote_sim_pct": 23.020447120149772,
+      "taxa_calote_nao_pct": 13.229430953243929,
+      "gini_ponderado": 0.3429400225410712,
+      "ganho": 0.0016010974589287241
+    },
+    {
+      "pergunta": "PAY_0 >= 0",
+      "limiar_sklearn": "PAY_0 <= -0.5",
+      "n_sim": 21555,
+      "taxa_calote_sim_pct": 24.667130596149388,
+      "taxa_calote_nao_pct": 15.618709295441088,
+      "gini_ponderado": 0.3412291927063913,
+      "ganho": 0.0033119272936086297
+    },
+    {
+      "pergunta": "PAY_0 >= 1",
+      "limiar_sklearn": "PAY_0 <= 0.5",
+      "n_sim": 6818,
+      "taxa_calote_sim_pct": 50.293341155764146,
+      "taxa_calote_nao_pct": 13.834009145026313,
+      "gini_ponderado": 0.29785231056585687,
+      "ganho": 0.04668880943414305
+    },
+    {
+      "pergunta": "PAY_0 >= 2",
+      "limiar_sklearn": "PAY_0 <= 1.5",
+      "n_sim": 3130,
+      "taxa_calote_sim_pct": 69.55271565495208,
+      "taxa_calote_nao_pct": 16.594715295868998,
+      "gini_ponderado": 0.29212526834325964,
+      "ganho": 0.05241585165674029
+    },
+    {
+      "pergunta": "PAY_0 >= 3",
+      "limiar_sklearn": "PAY_0 <= 2.5",
+      "n_sim": 463,
+      "taxa_calote_sim_pct": 71.92224622030238,
+      "taxa_calote_nao_pct": 21.339337102617055,
+      "gini_ponderado": 0.33676536683389613,
+      "ganho": 0.007775753166103794
+    },
+    {
+      "pergunta": "PAY_0 >= 4",
+      "limiar_sklearn": "PAY_0 <= 3.5",
+      "n_sim": 141,
+      "taxa_calote_sim_pct": 63.12056737588653,
+      "taxa_calote_nao_pct": 21.926387353896647,
+      "gini_ponderado": 0.34295347433172324,
+      "ganho": 0.0015876456682766826
+    },
+    {
+      "pergunta": "PAY_0 >= 5",
+      "limiar_sklearn": "PAY_0 <= 4.5",
+      "n_sim": 65,
+      "taxa_calote_sim_pct": 56.92307692307692,
+      "taxa_calote_nao_pct": 22.044429597461164,
+      "gini_ponderado": 0.34401510349346665,
+      "ganho": 0.0005260165065332778
+    },
+    {
+      "pergunta": "PAY_0 >= 6",
+      "limiar_sklearn": "PAY_0 <= 5.5",
+      "n_sim": 39,
+      "taxa_calote_sim_pct": 61.53846153846154,
+      "taxa_calote_nao_pct": 22.06868929608491,
+      "gini_ponderado": 0.3441366021982423,
+      "ganho": 0.0004045178017575979
+    },
+    {
+      "pergunta": "PAY_0 >= 7",
+      "limiar_sklearn": "PAY_0 <= 6.5",
+      "n_sim": 28,
+      "taxa_calote_sim_pct": 64.28571428571429,
+      "taxa_calote_nao_pct": 22.080608567996798,
+      "gini_ponderado": 0.3442089264265696,
+      "ganho": 0.0003321935734303394
+    },
+    {
+      "pergunta": "PAY_0 >= 8",
+      "limiar_sklearn": "PAY_0 <= 7.5",
+      "n_sim": 19,
+      "taxa_calote_sim_pct": 57.89473684210527,
+      "taxa_calote_nao_pct": 22.097328307928354,
+      "gini_ponderado": 0.34437890523647435,
+      "ganho": 0.00016221476352556996
+    }
+  ],
+  "arvore_profundidade_2_sklearn": {
+    "parametros": "DecisionTreeClassifier(criterion='gini', max_depth=2, random_state=0), 30 000 linhas",
+    "texto": "|--- PAY_0 <= 1.50\n|   |--- PAY_2 <= 1.50\n|   |   |--- weights: [21085.00, 3514.00] class: 0\n|   |--- PAY_2 >  1.50\n|   |   |--- weights: [1326.00, 945.00] class: 0\n|--- PAY_0 >  1.50\n|   |--- PAY_3 <= -0.50\n|   |   |--- weights: [103.00, 87.00] class: 0\n|   |--- PAY_3 >  -0.50\n|   |   |--- weights: [850.00, 2090.00] class: 1\n",
+    "nos": [
+      {
+        "no": 0,
+        "n": 30000,
+        "pagou": 23364,
+        "calote": 6636,
+        "taxa_de_calote_pct": 22.12,
+        "gini_sklearn": 0.34454112000000003,
+        "gini_conferido": 0.3445411199999999,
+        "pergunta": "PAY_0 <= 1.5",
+        "coluna": "PAY_0",
+        "limiar": 1.5,
+        "filho_sim_<=limiar": 1,
+        "filho_nao_>limiar": 4
+      },
+      {
+        "no": 1,
+        "n": 26870,
+        "pagou": 22411,
+        "calote": 4459,
+        "taxa_de_calote_pct": 16.594715295868998,
+        "gini_sklearn": 0.27681739076719025,
+        "gini_conferido": 0.27681739076719025,
+        "pergunta": "PAY_2 <= 1.5",
+        "coluna": "PAY_2",
+        "limiar": 1.5,
+        "filho_sim_<=limiar": 2,
+        "filho_nao_>limiar": 3
+      },
+      {
+        "no": 2,
+        "n": 24599,
+        "pagou": 21085,
+        "calote": 3514,
+        "taxa_de_calote_pct": 14.285133542013902,
+        "gini_sklearn": 0.2448896627776439,
+        "gini_conferido": 0.244889662777644,
+        "folha": true,
+        "preve": "pagou"
+      },
+      {
+        "no": 3,
+        "n": 2271,
+        "pagou": 1326,
+        "calote": 945,
+        "taxa_de_calote_pct": 41.611624834874505,
+        "gini_sklearn": 0.4859270324178212,
+        "gini_conferido": 0.4859270324178212,
+        "folha": true,
+        "preve": "pagou"
+      },
+      {
+        "no": 4,
+        "n": 3130,
+        "pagou": 953,
+        "calote": 2177,
+        "taxa_de_calote_pct": 69.55271565495208,
+        "gini_sklearn": 0.42353826210331835,
+        "gini_conferido": 0.42353826210331835,
+        "pergunta": "PAY_3 <= -0.5",
+        "coluna": "PAY_3",
+        "limiar": -0.5,
+        "filho_sim_<=limiar": 5,
+        "filho_nao_>limiar": 6
+      },
+      {
+        "no": 5,
+        "n": 190,
+        "pagou": 103,
+        "calote": 87,
+        "taxa_de_calote_pct": 45.78947368421053,
+        "gini_sklearn": 0.4964542936288089,
+        "gini_conferido": 0.4964542936288089,
+        "folha": true,
+        "preve": "pagou"
+      },
+      {
+        "no": 6,
+        "n": 2940,
+        "pagou": 850,
+        "calote": 2090,
+        "taxa_de_calote_pct": 71.08843537414965,
+        "gini_sklearn": 0.4110555786940626,
+        "gini_conferido": 0.4110555786940626,
+        "folha": true,
+        "preve": "calote"
+      }
+    ],
+    "raiz_bate_com_a_conta": true,
+    "explicacao": "A raiz do scikit-learn é PAY_0 <= 1,5, que com valores inteiros é a mesma pergunta 'atraso de 2 meses ou mais?' (o lado 'não' do sklearn é o 'sim' da nossa pergunta). As contagens e o Gini de cada lado são idênticos aos da conta à mão, e a busca exaustiva em numpy chega ao mesmo corte (PAY_0 <= 1.5).",
+    "ganho_raiz_sklearn": 0.0524158516567404,
+    "leitura": {
+      "PAY_2 <= 1.5": "lado de quem NÃO está 2+ meses atrasado em setembro: a próxima pergunta é 'estava 2+ meses atrasado em agosto?'",
+      "PAY_3 <= -0.5": "lado de quem está 2+ meses atrasado em setembro: a próxima pergunta é 'julho estava em dia?' (-1 = em dia; -2 não tem definição oficial)",
+      "so_uma_folha_preve_calote": true
+    },
+    "acuracia_nos_30000": 0.8201333333333334
+  },
+  "overfitting": {
+    "divisao": "train_test_split(test_size=0.3, stratify=y, random_state=42): 21000 treino, 9000 teste",
+    "chute_todo_mundo_paga_teste_pct": 77.87777777777778,
+    "profundidade_2": {
+      "profundidade_max": 2,
+      "profundidade_real": 2,
+      "folhas": 4,
+      "acuracia_treino_pct": 82.11904761904762,
+      "acuracia_teste_pct": 81.76666666666667,
+      "calotes_do_teste_detectados_pct": 30.989452536413864,
+      "alarmes_certos_pct": 69.79638009049773,
+      "clientes_de_treino_por_folha": 5250.0
+    },
+    "sem_limite": {
+      "profundidade_max": "sem limite",
+      "profundidade_real": 40,
+      "folhas": 3251,
+      "acuracia_treino_pct": 99.94761904761906,
+      "acuracia_teste_pct": 72.32222222222222,
+      "calotes_do_teste_detectados_pct": 40.331491712707184,
+      "alarmes_certos_pct": 38.129154795821464,
+      "clientes_de_treino_por_folha": 6.459550907413104
+    },
+    "sem_limite_perde_do_chute_por_pontos": 5.555555555555557,
+    "queda_treino_para_teste_sem_limite_pontos": 27.625396825396834,
+    "curva_por_profundidade": [
+      {
+        "profundidade_max": 1,
+        "profundidade_real": 1,
+        "folhas": 2,
+        "acuracia_treino_pct": 82.01904761904761,
+        "acuracia_teste_pct": 81.82222222222222,
+        "calotes_do_teste_detectados_pct": 32.39578101456554,
+        "alarmes_certos_pct": 68.98395721925134,
+        "clientes_de_treino_por_folha": 10500.0
+      },
+      {
+        "profundidade_max": 2,
+        "profundidade_real": 2,
+        "folhas": 4,
+        "acuracia_treino_pct": 82.11904761904762,
+        "acuracia_teste_pct": 81.76666666666667,
+        "calotes_do_teste_detectados_pct": 30.989452536413864,
+        "alarmes_certos_pct": 69.79638009049773,
+        "clientes_de_treino_por_folha": 5250.0
+      },
+      {
+        "profundidade_max": 3,
+        "profundidade_real": 3,
+        "folhas": 8,
+        "acuracia_treino_pct": 82.43809523809524,
+        "acuracia_teste_pct": 81.75555555555556,
+        "calotes_do_teste_detectados_pct": 35.76092415871421,
+        "alarmes_certos_pct": 66.23255813953489,
+        "clientes_de_treino_por_folha": 2625.0
+      },
+      {
+        "profundidade_max": 4,
+        "profundidade_real": 4,
+        "folhas": 16,
+        "acuracia_treino_pct": 82.48095238095237,
+        "acuracia_teste_pct": 81.75555555555556,
+        "calotes_do_teste_detectados_pct": 35.66047212456052,
+        "alarmes_certos_pct": 66.29318394024276,
+        "clientes_de_treino_por_folha": 1312.5
+      },
+      {
+        "profundidade_max": 5,
+        "profundidade_real": 5,
+        "folhas": 32,
+        "acuracia_treino_pct": 82.63333333333334,
+        "acuracia_teste_pct": 81.64444444444445,
+        "calotes_do_teste_detectados_pct": 34.15369161225515,
+        "alarmes_certos_pct": 66.60137120470128,
+        "clientes_de_treino_por_folha": 656.25
+      },
+      {
+        "profundidade_max": 6,
+        "profundidade_real": 6,
+        "folhas": 59,
+        "acuracia_treino_pct": 82.82857142857142,
+        "acuracia_teste_pct": 81.69999999999999,
+        "calotes_do_teste_detectados_pct": 33.952787543947764,
+        "alarmes_certos_pct": 67.06349206349206,
+        "clientes_de_treino_por_folha": 355.93220338983053
+      },
+      {
+        "profundidade_max": 7,
+        "profundidade_real": 7,
+        "folhas": 99,
+        "acuracia_treino_pct": 83.11428571428571,
+        "acuracia_teste_pct": 81.57777777777778,
+        "calotes_do_teste_detectados_pct": 33.350075339025615,
+        "alarmes_certos_pct": 66.73366834170854,
+        "clientes_de_treino_por_folha": 212.12121212121212
+      },
+      {
+        "profundidade_max": 8,
+        "profundidade_real": 8,
+        "folhas": 152,
+        "acuracia_treino_pct": 83.58095238095238,
+        "acuracia_teste_pct": 80.9888888888889,
+        "calotes_do_teste_detectados_pct": 36.56454043194375,
+        "alarmes_certos_pct": 61.904761904761905,
+        "clientes_de_treino_por_folha": 138.1578947368421
+      },
+      {
+        "profundidade_max": 9,
+        "profundidade_real": 9,
+        "folhas": 231,
+        "acuracia_treino_pct": 84.26190476190476,
+        "acuracia_teste_pct": 80.9,
+        "calotes_do_teste_detectados_pct": 35.35911602209944,
+        "alarmes_certos_pct": 61.97183098591549,
+        "clientes_de_treino_por_folha": 90.9090909090909
+      },
+      {
+        "profundidade_max": 10,
+        "profundidade_real": 10,
+        "folhas": 339,
+        "acuracia_treino_pct": 85.25238095238096,
+        "acuracia_teste_pct": 80.53333333333333,
+        "calotes_do_teste_detectados_pct": 37.31793068809643,
+        "alarmes_certos_pct": 59.582999198075385,
+        "clientes_de_treino_por_folha": 61.94690265486726
+      },
+      {
+        "profundidade_max": 11,
+        "profundidade_real": 11,
+        "folhas": 465,
+        "acuracia_treino_pct": 86.35238095238094,
+        "acuracia_teste_pct": 80.13333333333334,
+        "calotes_do_teste_detectados_pct": 37.21747865394274,
+        "alarmes_certos_pct": 57.93588741204066,
+        "clientes_de_treino_por_folha": 45.16129032258065
+      },
+      {
+        "profundidade_max": 12,
+        "profundidade_real": 12,
+        "folhas": 618,
+        "acuracia_treino_pct": 87.27142857142857,
+        "acuracia_teste_pct": 79.7,
+        "calotes_do_teste_detectados_pct": 36.26318432948267,
+        "alarmes_certos_pct": 56.40625,
+        "clientes_de_treino_por_folha": 33.980582524271846
+      },
+      {
+        "profundidade_max": 13,
+        "profundidade_real": 13,
+        "folhas": 808,
+        "acuracia_treino_pct": 88.47142857142856,
+        "acuracia_teste_pct": 79.24444444444444,
+        "calotes_do_teste_detectados_pct": 35.71069814163737,
+        "alarmes_certos_pct": 54.734411085450354,
+        "clientes_de_treino_por_folha": 25.99009900990099
+      },
+      {
+        "profundidade_max": 14,
+        "profundidade_real": 14,
+        "folhas": 1019,
+        "acuracia_treino_pct": 89.57142857142857,
+        "acuracia_teste_pct": 78.5111111111111,
+        "calotes_do_teste_detectados_pct": 36.212958312405824,
+        "alarmes_certos_pct": 52.05776173285198,
+        "clientes_de_treino_por_folha": 20.608439646712462
+      },
+      {
+        "profundidade_max": 15,
+        "profundidade_real": 15,
+        "folhas": 1206,
+        "acuracia_treino_pct": 90.73809523809524,
+        "acuracia_teste_pct": 77.95555555555555,
+        "calotes_do_teste_detectados_pct": 37.066800602712206,
+        "alarmes_certos_pct": 50.23825731790333,
+        "clientes_de_treino_por_folha": 17.412935323383085
+      },
+      {
+        "profundidade_max": 16,
+        "profundidade_real": 16,
+        "folhas": 1386,
+        "acuracia_treino_pct": 91.56666666666666,
+        "acuracia_teste_pct": 77.78888888888889,
+        "calotes_do_teste_detectados_pct": 37.31793068809643,
+        "alarmes_certos_pct": 49.732262382864796,
+        "clientes_de_treino_por_folha": 15.151515151515152
+      },
+      {
+        "profundidade_max": 17,
+        "profundidade_real": 17,
+        "folhas": 1559,
+        "acuracia_treino_pct": 92.46666666666667,
+        "acuracia_teste_pct": 77.06666666666668,
+        "calotes_do_teste_detectados_pct": 36.26318432948267,
+        "alarmes_certos_pct": 47.59393539881345,
+        "clientes_de_treino_por_folha": 13.470173187940988
+      },
+      {
+        "profundidade_max": 18,
+        "profundidade_real": 18,
+        "folhas": 1722,
+        "acuracia_treino_pct": 93.28095238095237,
+        "acuracia_teste_pct": 76.34444444444445,
+        "calotes_do_teste_detectados_pct": 36.46408839779006,
+        "alarmes_certos_pct": 45.660377358490564,
+        "clientes_de_treino_por_folha": 12.195121951219512
+      },
+      {
+        "profundidade_max": 19,
+        "profundidade_real": 19,
+        "folhas": 1879,
+        "acuracia_treino_pct": 94.06666666666666,
+        "acuracia_teste_pct": 75.72222222222223,
+        "calotes_do_teste_detectados_pct": 35.66047212456052,
+        "alarmes_certos_pct": 43.99008674101611,
+        "clientes_de_treino_por_folha": 11.176157530601383
+      },
+      {
+        "profundidade_max": 20,
+        "profundidade_real": 20,
+        "folhas": 2067,
+        "acuracia_treino_pct": 94.99047619047619,
+        "acuracia_teste_pct": 75.36666666666667,
+        "calotes_do_teste_detectados_pct": 35.86137619286791,
+        "alarmes_certos_pct": 43.16807738814994,
+        "clientes_de_treino_por_folha": 10.159651669085632
+      },
+      {
+        "profundidade_max": "sem limite",
+        "profundidade_real": 40,
+        "folhas": 3251,
+        "acuracia_treino_pct": 99.94761904761906,
+        "acuracia_teste_pct": 72.32222222222222,
+        "calotes_do_teste_detectados_pct": 40.331491712707184,
+        "alarmes_certos_pct": 38.129154795821464,
+        "clientes_de_treino_por_folha": 6.459550907413104
+      }
+    ],
+    "validacao_cruzada_5_dobras_no_treino": [
+      {
+        "profundidade": 1,
+        "acuracia_cv_pct": 82.01904761904763
+      },
+      {
+        "profundidade": 2,
+        "acuracia_cv_pct": 82.10476190476189
+      },
+      {
+        "profundidade": 3,
+        "acuracia_cv_pct": 82.20476190476191
+      },
+      {
+        "profundidade": 4,
+        "acuracia_cv_pct": 82.17142857142858
+      },
+      {
+        "profundidade": 5,
+        "acuracia_cv_pct": 82.19523809523808
+      },
+      {
+        "profundidade": 6,
+        "acuracia_cv_pct": 81.92857142857143
+      },
+      {
+        "profundidade": 7,
+        "acuracia_cv_pct": 81.7904761904762
+      },
+      {
+        "profundidade": 8,
+        "acuracia_cv_pct": 81.34285714285714
+      },
+      {
+        "profundidade": 9,
+        "acuracia_cv_pct": 81.0047619047619
+      },
+      {
+        "profundidade": 10,
+        "acuracia_cv_pct": 80.7
+      },
+      {
+        "profundidade": 11,
+        "acuracia_cv_pct": 80.40476190476191
+      },
+      {
+        "profundidade": 12,
+        "acuracia_cv_pct": 79.69999999999999
+      },
+      {
+        "profundidade": 13,
+        "acuracia_cv_pct": 79.2952380952381
+      },
+      {
+        "profundidade": 14,
+        "acuracia_cv_pct": 78.82857142857144
+      },
+      {
+        "profundidade": 15,
+        "acuracia_cv_pct": 78.5
+      }
+    ],
+    "melhor_profundidade_cv": {
+      "profundidade": 3,
+      "acuracia_cv_pct": 82.20476190476191
+    },
+    "teste_na_profundidade_cv": {
+      "profundidade_max": 3,
+      "profundidade_real": 3,
+      "folhas": 8,
+      "acuracia_treino_pct": 82.43809523809524,
+      "acuracia_teste_pct": 81.75555555555556,
+      "calotes_do_teste_detectados_pct": 35.76092415871421,
+      "alarmes_certos_pct": 66.23255813953489,
+      "clientes_de_treino_por_folha": 2625.0
+    },
+    "duplicatas_de_atributos_no_dataset": 56,
+    "sementes_0_a_9": {
+      "linhas": [
+        {
+          "semente": 0,
+          "prof2_treino": 81.96666666666667,
+          "prof2_teste": 81.94444444444444,
+          "livre_treino": 99.95238095238095,
+          "livre_teste": 71.75555555555555,
+          "livre_folhas": 3289,
+          "chute_teste": 77.87777777777778
+        },
+        {
+          "semente": 1,
+          "prof2_treino": 82.15238095238095,
+          "prof2_teste": 81.74444444444444,
+          "livre_treino": 99.93333333333332,
+          "livre_teste": 71.66666666666667,
+          "livre_folhas": 3329,
+          "chute_teste": 77.87777777777778
+        },
+        {
+          "semente": 2,
+          "prof2_treino": 82.13809523809525,
+          "prof2_teste": 81.72222222222221,
+          "livre_treino": 99.96190476190476,
+          "livre_teste": 72.13333333333334,
+          "livre_folhas": 3311,
+          "chute_teste": 77.87777777777778
+        },
+        {
+          "semente": 3,
+          "prof2_treino": 82.05238095238096,
+          "prof2_teste": 81.92222222222222,
+          "livre_treino": 99.94761904761906,
+          "livre_teste": 72.43333333333334,
+          "livre_folhas": 3295,
+          "chute_teste": 77.87777777777778
+        },
+        {
+          "semente": 4,
+          "prof2_treino": 82.17142857142858,
+          "prof2_teste": 81.71111111111111,
+          "livre_treino": 99.96666666666667,
+          "livre_teste": 71.97777777777777,
+          "livre_folhas": 3304,
+          "chute_teste": 77.87777777777778
+        },
+        {
+          "semente": 5,
+          "prof2_treino": 81.99047619047619,
+          "prof2_teste": 82.06666666666666,
+          "livre_treino": 99.94761904761906,
+          "livre_teste": 72.41111111111111,
+          "livre_folhas": 3338,
+          "chute_teste": 77.87777777777778
+        },
+        {
+          "semente": 6,
+          "prof2_treino": 82.19047619047619,
+          "prof2_teste": 81.6,
+          "livre_treino": 99.94285714285715,
+          "livre_teste": 71.9888888888889,
+          "livre_folhas": 3317,
+          "chute_teste": 77.87777777777778
+        },
+        {
+          "semente": 7,
+          "prof2_treino": 82.0,
+          "prof2_teste": 82.11111111111111,
+          "livre_treino": 99.94285714285715,
+          "livre_teste": 72.57777777777777,
+          "livre_folhas": 3341,
+          "chute_teste": 77.87777777777778
+        },
+        {
+          "semente": 8,
+          "prof2_treino": 82.15714285714286,
+          "prof2_teste": 81.67777777777778,
+          "livre_treino": 99.95714285714286,
+          "livre_teste": 72.78888888888889,
+          "livre_folhas": 3285,
+          "chute_teste": 77.87777777777778
+        },
+        {
+          "semente": 9,
+          "prof2_treino": 82.02857142857142,
+          "prof2_teste": 81.8,
+          "livre_treino": 99.95238095238095,
+          "livre_teste": 72.54444444444445,
+          "livre_folhas": 3270,
+          "chute_teste": 77.87777777777778
+        }
+      ],
+      "media": {
+        "prof2_treino": 82.0847619047619,
+        "prof2_teste": 81.83,
+        "livre_treino": 99.95047619047618,
+        "livre_teste": 72.22777777777777,
+        "livre_folhas": 3307.9,
+        "chute_teste": 77.87777777777777
+      },
+      "min": {
+        "prof2_treino": 81.96666666666667,
+        "prof2_teste": 81.6,
+        "livre_treino": 99.93333333333332,
+        "livre_teste": 71.66666666666667,
+        "livre_folhas": 3270.0,
+        "chute_teste": 77.87777777777778
+      },
+      "max": {
+        "prof2_treino": 82.19047619047619,
+        "prof2_teste": 82.11111111111111,
+        "livre_treino": 99.96666666666667,
+        "livre_teste": 72.78888888888889,
+        "livre_folhas": 3341.0,
+        "chute_teste": 77.87777777777778
+      },
+      "sem_limite_abaixo_do_chute_em_todas": true
+    }
+  }
+}
