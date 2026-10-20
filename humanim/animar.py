@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .comum import RAIZ, Erro, ok, pasta_do_video, relativo, rodar, trabalho
 from .formato import ALTURA, FPS, LARGURA
-from .roteiro import ler_roteiro, ler_tempos, quadros
+from .roteiro import EDICAO, ler_roteiro, ler_tempos, quadros
 
 ESTILO = RAIZ / "estilo"
 PARALELO = int(os.environ.get("HUMANIM_PARALELO", 3))
@@ -165,8 +165,13 @@ def main(args):
         arquivo.write_text(json.dumps(cache, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     ex.shutdown()
 
-    origem = ("tempos estimados (sem tempos.json; depois de gravar, rode animar de novo)" if estimado
-              else "tempos reais do tempos.json")
+    if estimado:
+        origem = "tempos estimados (sem tempos.json; depois de gravar e editar, rode animar de novo)"
+    elif (pasta / EDICAO).exists():
+        origem = "tempos da fala editada (edicao.json)"
+    else:
+        origem = (f"tempos reais do tempos.json, fala SEM edição (para cortar pausas e muletas: humanim editar "
+                  f"{relativo(pasta / 'gravacao.webm')} e animar de novo)")
     if os.environ.get("HUMANIM_DEPURAR"):
         origem += "; COM a zona segura e a do canto desenhadas: rode sem HUMANIM_DEPURAR antes de montar"
     if falhas:

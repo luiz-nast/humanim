@@ -1,18 +1,39 @@
-"""humanim montar: junta gravação, tempos e animações em saida.mp4.
+"""humanim montar: junta gravação, tempos, edição e animações em saida.mp4.
 
-O áudio é sempre a voz da gravação; o roteiro só decide a imagem de cada linha.
+O áudio é sempre a voz da gravação; o roteiro só decide a imagem de cada linha. Com edicao.json, cada
+linha é a soma dos seus trechos: vídeo e áudio cortados no mesmo quadro, com um crossfade de 10 ms
+na emenda do áudio e, no [CARA], um zoom que alterna a cada pulo para o corte parecer troca de plano.
 """
 import json
+import subprocess
+from dataclasses import dataclass
+
+import numpy as np
 
 from .animar import assinatura
 from .comum import Erro, duracao, ok, pasta_do_video, relativo, rodar, trabalho
-from .formato import ALTURA, CANTO, FPS, LARGURA
-from .roteiro import ler_roteiro, ler_tempos, quadros
+from .formato import ALTURA, CANTO, FPS, LARGURA, lados_soltos
+from .roteiro import EDICAO, ler_roteiro, ler_tempos, quadros
 from .tratar import assinatura as assinatura_gravacao, fonte_da_tratada
 
-BORDA = 4  # borda clara em volta de você no [CANTO], quando a gravação tem fundo
+BORDA = 4  # contorno claro nos lados do [CANTO] que não encostam na tela, quando a gravação tem fundo
 X264 = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(FPS)]
-FADE = 0.005  # micro fade nas pontas de cada trecho de áudio, para não estalar
+SR = 48000
+CROSSFADE = 480  # amostras (10 ms) de crossfade em cada emenda do áudio: não estala e não muda a duração
+ZOOM = 1.12  # jump cut no [CARA]: alterna 100% e 112%
+# Altura (fração) que fica parada no zoom: a borda de baixo da faixa de cima que a interface do app cobre
+# (200 de 1920 px, a que o teleprompter manda deixar a cabeça abaixo). Assim o zoom só cresce para baixo e
+# nada que estava fora da faixa entra embaixo dela.
+ALTURA_ZOOM = 200 / ALTURA
+FOLGA_CABECA = 0.06  # no [CANTO] sem fundo, folga acima da cabeça (fração da altura da gravação)
+
+
+@dataclass
+class Peca:
+    """Um trecho da gravação dentro de uma linha: de que quadro sai, quantos quadros e com que zoom."""
+    fonte: int
+    quadros: int
+    zoom: float = 1.0
 
 
 def contar_quadros(arquivo):
@@ -79,8 +100,84 @@ def normalizar(pasta, gravacao, com_alfa):
     return video, audio
 
 
-def segmento(linha, n, inicio, clipe, video, com_alfa, destino):
-    """A imagem de uma linha: exatamente n quadros, a partir do quadro `inicio` da gravação."""
+def planejar(linhas, tempos, contagens):
+    """As peças de cada linha. Os quadros de cada trecho saem das fronteiras acumuladas dentro da linha
+    (como em quadros()), e a última peça fecha a conta: a linha tem sempre os quadros que quadros() deu.
+
+    Zoom: no [CARA], cada vez que a gravação pula (corte da edição dentro da linha, ou de uma linha
+    [CARA] para a seguinte com fala cortada entre elas) o zoom troca entre 100% e ZOOM.
+    """
+    plano, zoom, anterior, pulos = [], 1.0, None, 0
+    for linha, tempo, n in zip(linhas, tempos, contagens):
+        pecas, acumulado, usados = [], 0.0, 0
+        for k, (a, b) in enumerate(tempo.trechos):
+            acumulado += b - a
+            q = n - usados if k == len(tempo.trechos) - 1 else round(acumulado * FPS) - usados
+            q = max(0, q)
+            usados += q
+            if linha.marca == "CARA":
+                if anterior and anterior[0] == "CARA" and abs(a - anterior[1]) > 0.5 / FPS:
+                    zoom, pulos = (1.0 if zoom != 1.0 else ZOOM), pulos + 1
+                elif not anterior or anterior[0] != "CARA":
+                    zoom = 1.0
+            anterior = (linha.marca, b)
+            if q:
+                pecas.append(Peca(round(a * FPS), q, zoom if linha.marca == "CARA" else 1.0))
+        plano.append(pecas)
+    return plano, pulos
+
+
+def dimensoes(video):
+    saida = rodar(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                   "-of", "csv=p=0", video], f"ffprobe em {video}")
+    w, h = saida.strip().split(",")[:2]
+    return int(w), int(h)
+
+
+def enquadrar_canto(video, indices):
+    """Recorte (x, y, largura, altura) da gravação sem fundo para o [CANTO], ou None se não achou você.
+
+    Do peito para cima e ancorado embaixo: o recorte termina na borda de baixo da gravação, então o
+    corpo continua até a borda da tela. Em cima, a cabeça com uma folga pequena (na posição mais alta
+    que ela chega). Na horizontal, o ombro esquerdo passa um pouco da borda esquerda (corte, não
+    encostadinho), sem a cabeça ir para menos de 35% da largura. Quem senta à direita do centro deixa o
+    recorte sair da gravação pela direita (lá fica transparente: o segmento estende a imagem antes de
+    recortar), para o ombro ainda chegar na borda. Mede a máscara (alfa) em alguns quadros das linhas
+    [CANTO].
+    """
+    w, h = dimensoes(video)
+    lw, lh = max(8, w // 4), max(8, h // 4)
+    unicos = sorted(set(indices))
+    selecao = "+".join(f"eq(n\\,{i})" for i in unicos)
+    r = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-c:v", "ffv1", "-i", str(video), "-vf",
+                        f"select={selecao},alphaextract,scale={lw}:{lh}", "-fps_mode", "passthrough",
+                        "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True)
+    if r.returncode != 0 or len(r.stdout) < lw * lh:
+        return None
+    mascaras = np.frombuffer(r.stdout, np.uint8)[:len(r.stdout) // (lw * lh) * lw * lh].reshape(-1, lh, lw) > 128
+    presenca = mascaras.mean(axis=0)
+    if not 0.02 < presenca.mean() < 0.95:
+        return None  # o tratar não achou ninguém (ou achou tudo): melhor o quadro inteiro
+    linhas = np.nonzero(presenca.max(axis=1) >= 0.2)[0]
+    if not len(linhas):
+        return None
+    topo = linhas[0] / lh
+    cabeca = presenca[linhas[0]:linhas[0] + max(1, int(lh * 0.15))]
+    centro = float((cabeca.sum(axis=0) * np.arange(lw)).sum() / max(cabeca.sum(), 1e-9) / lw)
+    embaixo = np.nonzero(presenca[int(lh * 0.92):].mean(axis=0) >= 0.5)[0]
+    ombro = embaixo[0] / lw if len(embaixo) else centro
+    alt = min(1.0, max(0.5, 1 - topo + FOLGA_CABECA))  # zoom de no máximo 2x
+    larg = min(1.0, alt * h * 3 / 4 / w)
+    alt = min(1.0, larg * w * 4 / 3 / h)
+    x0 = min(max(ombro + 0.05 * larg, centro - 0.5 * larg), centro - 0.35 * larg)  # o ombro passa da borda
+    x0 = max(0.0, x0)  # x0 + larg pode passar de 1: o recorte sai pela direita, transparente
+    cw, ch = int(larg * w) // 2 * 2, int(alt * h) // 2 * 2
+    return int(x0 * w) // 2 * 2, h - ch, cw, ch
+
+
+def segmento(linha, pecas, clipe, video, com_alfa, recorte, destino):
+    """A imagem de uma linha: exatamente sum(quadros) quadros, peça a peça da gravação."""
+    n = sum(p.quadros for p in pecas)
     cmd = ["ffmpeg", "-nostdin", "-y", "-v", "error"]
     if linha.marca == "CARA":
         filtros = [f"color=c=black:s={LARGURA}x{ALTURA}:r={FPS}[base]"]
@@ -89,18 +186,37 @@ def segmento(linha, n, inicio, clipe, video, com_alfa, destino):
         filtros = [f"[0:v]setpts=N/({FPS}*TB),scale={LARGURA}:{ALTURA},setsar=1,tpad=stop_mode=clone:stop=2[base]"]
     saida = "[base]"
     if linha.marca != "ANIM":
-        entrada = 0 if linha.marca == "CARA" else 1
-        cmd += ["-ss", f"{max(0, inicio - 0.5) / FPS:.6f}", "-i", video]
+        primeira = 0 if linha.marca == "CARA" else 1
         if linha.marca == "CARA":
             x, y = 0, 0
-            pessoa = f"crop='min(iw,ih*9/16)':'min(ih,iw*16/9)',scale={LARGURA}:{ALTURA}"
         else:
             x, y, largura, altura = CANTO
-            pessoa = f"scale={largura}:{altura}"
-            if not com_alfa:
-                pessoa += f",pad=iw+{2 * BORDA}:ih+{2 * BORDA}:{BORDA}:{BORDA}:color=0xEEEEEE"
-                x, y = x - BORDA, y - BORDA
-        filtros.append(f"[{entrada}:v]setpts=N/({FPS}*TB),{pessoa},setsar=1,tpad=stop_mode=clone:stop={n}[p]")
+            esq, cima, dir_, baixo = lados_soltos(*CANTO)
+            if com_alfa:
+                rx, ry, rw, rh = recorte or (0, 0, 0, 0)
+                corte = (f"pad=w='max(iw,{rx + rw})':h=ih:x=0:y=0:color=black@0,crop={rw}:{rh}:{rx}:{ry},"
+                         if recorte else "")
+                canto = f"{corte}scale={largura}:{altura}"
+            else:  # retângulo encostado na tela; contorno só nos lados que ficam soltos
+                canto = (f"scale={largura}:{altura},pad=iw+{BORDA * (esq + dir_)}:ih+{BORDA * (cima + baixo)}:"
+                         f"{BORDA * esq}:{BORDA * cima}:color=0xEEEEEE")
+                x, y = x - BORDA * esq, y - BORDA * cima
+        rotulos = []
+        for k, p in enumerate(pecas):
+            if linha.marca == "CARA":
+                z = f"/{p.zoom:g}" if p.zoom != 1.0 else ""
+                pessoa = (f"crop=w='min(iw,ih*9/16){z}':h='min(ih,iw*16/9){z}':x='(iw-ow)/2':"
+                          f"y='(ih-oh)*{ALTURA_ZOOM}',scale={LARGURA}:{ALTURA}")
+            else:
+                pessoa = canto
+            cmd += ["-ss", f"{max(0, p.fonte - 0.5) / FPS:.6f}", "-i", video]
+            filtros.append(f"[{primeira + k}:v]setpts=N/({FPS}*TB),tpad=stop_mode=clone:stop={p.quadros},"
+                           f"trim=end_frame={p.quadros},{pessoa},setsar=1[p{k}]")
+            rotulos.append(f"[p{k}]")
+        if len(rotulos) > 1:
+            filtros.append("".join(rotulos) + f"concat=n={len(rotulos)}:v=1:a=0[p]")
+        else:
+            filtros[-1] = filtros[-1][:-len("[p0]")] + "[p]"
         filtros.append(f"[base][p]overlay={x}:{y}[v]")
         saida = "[v]"
     rodar([*cmd, "-filter_complex", ";".join(filtros), "-map", saida, "-frames:v", n, *X264, "-an", destino],
@@ -108,14 +224,24 @@ def segmento(linha, n, inicio, clipe, video, com_alfa, destino):
 
 
 def filtro_audio(tempos, entrada):
-    """Os trechos [de, ate] da gravação, na ordem, com micro fades, juntos e com volume normalizado."""
-    n = len(tempos)
+    """Os trechos da gravação, na ordem, emendados com crossfade, e com volume normalizado.
+
+    Cada emenda pega CROSSFADE/2 amostras de cada lado além do trecho e cruza as duas: a duração
+    total é exatamente a soma dos trechos (o vídeo não escorrega) e o corte não estala.
+    """
+    trechos = [(round(a * SR), round(b * SR)) for t in tempos for a, b in t.trechos]
+    n, meio = len(trechos), CROSSFADE // 2
     partes = [f"[{entrada}:a]asplit={n}" + "".join(f"[s{i}]" for i in range(n))]
-    for i, t in enumerate(tempos):
-        partes.append(f"[s{i}]atrim=start={t.de:.6f}:end={t.ate:.6f},asetpts=PTS-STARTPTS,"
-                      f"afade=t=in:d={FADE},afade=t=out:st={t.duracao - FADE:.6f}:d={FADE}[a{i}]")
-    partes.append("".join(f"[a{i}]" for i in range(n))
-                  + f"concat=n={n}:v=0:a=1,loudnorm=I=-16:TP=-1.5,aresample=48000[a]")
+    for i, (a, b) in enumerate(trechos):
+        a, b = a - (meio if i > 0 else 0), b + (meio if i < n - 1 else 0)
+        partes.append(f"[s{i}]atrim=start_sample={a}:end_sample={b},asetpts=PTS-STARTPTS[t{i}]")
+    atual = "[t0]"
+    for i in range(1, n):
+        partes.append(f"{atual}[t{i}]acrossfade=ns={CROSSFADE}:c1=tri:c2=tri[x{i}]")
+        atual = f"[x{i}]"
+    total = sum(b - a for a, b in trechos)
+    partes.append(f"{atual}afade=t=in:ns={meio},afade=t=out:ss={total - meio}:ns={meio},"
+                  f"loudnorm=I=-16:TP=-1.5,aresample={SR}[a]")
     return ";".join(partes)
 
 
@@ -140,10 +266,14 @@ def main(args):
                        f"{min(fim_video, fim_audio):.2f}s. tempos.json não é desta gravação: grave de novo.")
 
     t = trabalho(pasta)
+    plano, pulos = planejar(linhas, tempos, contagens)
+    no_canto = [p.fonte + k for linha, pecas in zip(linhas, plano) if linha.marca == "CANTO"
+                for p in pecas for k in range(0, p.quadros, max(1, p.quadros // 4))]
+    recorte = enquadrar_canto(video, no_canto[::max(1, len(no_canto) // 24)]) if com_alfa and no_canto else None
     segmentos = []
-    for linha, tempo, n in zip(linhas, tempos, contagens):
+    for linha, pecas in zip(linhas, plano):
         destino = t / f"seg_{linha.numero:02d}.mp4"
-        segmento(linha, n, round(tempo.de * FPS), pasta / "cenas" / f"{linha.cena}.mp4", video, com_alfa, destino)
+        segmento(linha, pecas, pasta / "cenas" / f"{linha.cena}.mp4", video, com_alfa, recorte, destino)
         segmentos.append(destino)
     lista = t / "segmentos.txt"
     lista.write_text("".join(f"file '{s}'\n" for s in segmentos), encoding="utf-8")
@@ -159,5 +289,15 @@ def main(args):
 
     por_marca = ", ".join(f"{m} {sum(1 for x in linhas if x.marca == m)}" for m in ("CARA", "ANIM", "CANTO"))
     fundo = "sem fundo (gravacao-tratada.webm)" if com_alfa else "com fundo (gravacao.webm)"
-    ok(f"{saida} montado: {total / FPS:.2f}s, {len(linhas)} linhas ({por_marca}), gravação {fundo}.{aviso}\n"
+    if com_alfa and recorte is None and any(x.marca == "CANTO" for x in linhas):
+        aviso += ("\nAtenção: não achei você na gravação tratada para recortar o [CANTO]; ela entrou inteira. "
+                  "Confira nos frames.")
+    if (pasta / EDICAO).exists():
+        cortes = sum(len(x.trechos) - 1 for x in tempos)
+        fala = f"fala editada (edicao.json: {cortes} corte(s) dentro das linhas, {pulos} pulo(s) com zoom no [CARA])"
+    else:
+        fala = "fala SEM edição"
+        aviso += (f"\nAtenção: sem edicao.json, a fala entra como foi gravada (pausas, muletas e repetições "
+                  f"junto). Para cortar: humanim editar {relativo(pasta / 'gravacao.webm')} e monte de novo.")
+    ok(f"{saida} montado: {total / FPS:.2f}s, {len(linhas)} linhas ({por_marca}), gravação {fundo}, {fala}.{aviso}\n"
        f"Próximo: humanim frames {relativo(saida)} e olhe as imagens em frames/.")

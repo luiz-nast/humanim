@@ -34,6 +34,9 @@ def main():
     s.add_argument("--porta", type=int, default=8765)
     s.add_argument("--nao-abrir", action="store_true", help="não abre o navegador sozinho")
 
+    s = sub.add_parser("editar", help="corta pausas, muletas e repetições da fala gravada")
+    s.add_argument("gravacao", nargs="?")
+
     s = sub.add_parser("tratar", help="remove o fundo da gravação")
     s.add_argument("gravacao", nargs="?")
 

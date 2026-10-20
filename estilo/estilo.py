@@ -9,6 +9,7 @@ from manim import *  # noqa: F401,F403
 from manim import config, np
 
 from humanim.formato import ALTURA, CANTO, FPS, LARGURA
+from humanim.roteiro import ritmo
 
 # Tela em pé com 8 unidades de largura: 135 px por unidade, a mesma escala de um
 # vídeo 1080p do Manim, então tamanhos de fonte e espessuras ficam com a cara de sempre.
@@ -124,14 +125,17 @@ class CenaHumanim(Scene):
         return max(0.0, self.duracao - self.time)
 
     def momento(self, quando, vez=1):
-        """Segundo da cena em que a fala chega em `quando`: fração (0.5) ou palavra(s) da fala ("aprovado")."""
+        """Segundo da cena em que a fala chega em `quando`: fração (0.5) ou palavra(s) da fala ("aprovado").
+        A posição da palavra sai do ritmo estimado da fala (sílabas, números por extenso e pausas da
+        pontuação), esticado ou encolhido para a duração da linha."""
         if isinstance(quando, str):
             todas = re.findall(r"\w+", self.fala.lower())
             busca = re.findall(r"\w+", quando.lower())
             achou = [i for i in range(len(todas)) if todas[i:i + len(busca)] == busca]
             if len(achou) < vez:
                 raise ValueError(f'"{quando}" (vez {vez}) não está na fala: "{self.fala}"')
-            quando = achou[vez - 1] / len(todas)
+            inicios, total = ritmo(self.fala)
+            quando = inicios[achou[vez - 1]] / total if total > 0 else achou[vez - 1] / len(todas)
         return quando * self.duracao
 
     def ate(self, quando, vez=1):

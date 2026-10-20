@@ -17,9 +17,10 @@
   #aviso.erro { color: #ff6b6b; font-size: clamp(22px, 2vw, 34px); }
   #camera { position: absolute; right: 24px; bottom: 24px; width: 260px; border-radius: 8px; overflow: hidden; }
   #previa { display: block; width: 100%; transform: scaleX(-1); opacity: .8; background: #111; }
-  /* O que o vídeo usa: no [CARA], a faixa 9:16 do meio do quadro 16:9 (31,64% da largura);
-     o topo dela (200 de 1920 px) fica embaixo da interface do app. */
-  #quadro { position: absolute; top: 0; bottom: 0; left: 34.18%; width: 31.64%; box-sizing: border-box;
+  /* O que o vídeo usa: no [CARA], a faixa 9:16 do meio do quadro 16:9 (31,64% da largura), que no plano
+     com zoom de 112% (montar.ZOOM) fica 1,12 vez mais estreita: o retângulo é essa, a que aparece nos dois
+     planos (28,25%). O topo dela (200 de 1920 px) fica embaixo da interface do app; o zoom não mexe nele. */
+  #quadro { position: absolute; top: 0; bottom: 0; left: 35.875%; width: 28.25%; box-sizing: border-box;
     border: 2px solid #ffd60a; box-shadow: 0 0 0 400px rgba(0, 0, 0, .55);
     background: linear-gradient(rgba(0, 0, 0, .6) 10.4%, transparent 10.4%); }
   #mic { height: 6px; background: #222; }
@@ -96,7 +97,7 @@ async function preparar() {
   if (estado !== 'preparando') return desligar();  // Esc enquanto ligava
   $('previa').srcObject = stream;
   $('previa').onloadedmetadata = () => {  // câmera que não é 16:9: a faixa usada muda de largura
-    const v = $('previa'), w = Math.min(1, v.videoHeight * 9 / 16 / v.videoWidth) * 100;
+    const v = $('previa'), w = Math.min(1, v.videoHeight * 9 / 16 / v.videoWidth) * 100 / 1.12;  // ZOOM
     Object.assign($('quadro').style, {width: `${w}%`, left: `${(100 - w) / 2}%`});
   };
   rec = new MediaRecorder(stream, {mimeType: TIPOS.find(t => MediaRecorder.isTypeSupported(t)),

@@ -32,12 +32,12 @@ A classe se chama `Cena` e herda de `CenaHumanim`. Não sobrescreva `__init__` n
 
 | | |
 | --- | --- |
-| `self.duracao` | segundos da fala desta linha (estimados antes da gravação, reais depois) |
+| `self.duracao` | segundos da fala desta linha (estimados antes da gravação; depois, os da fala editada) |
 | `self.marca`, `self.fala` | `"ANIM"` ou `"CANTO"`, e o texto falado |
 | `self.area`, `self.centro` | área livre para desenhar (esq, base, dir, topo) e o centro dela; em [CANTO] já exclui você |
 | `self.largura`, `self.altura` | tamanho da área livre |
 | `self.ate("palavra")` | espera até a fala chegar nessa palavra (`vez=2` para a segunda vez que ela aparece; aceita fração: `self.ate(0.5)`) |
-| `self.momento("palavra")` | o segundo em que a fala chega nela, sem esperar |
+| `self.momento("palavra")` | o segundo em que a fala chega nela, sem esperar (pelo ritmo estimado: sílabas, números por extenso, pausas da pontuação) |
 | `self.restante()` | segundos que ainda faltam |
 | `self.completar()` | espera o que falta até `self.duracao`; última linha de todo `construct` |
 
@@ -56,7 +56,7 @@ A tela tem 8 unidades de largura por 14,22 de altura, origem no centro (x de -4 
 1. **Ritmo de Reels, não de slide.** Algo muda a cada segundo, mais ou menos. A imagem acompanha a fala: quando a fala diz "aprovado", é ali que "aprovado" acende (`self.ate("aprovado")`).
 2. **Texto só como rótulo**, até 3 palavras, num nó, eixo, seta ou destaque. Nunca frase, lista de tópicos ou título de slide: a frase está na fala.
 3. **Tudo na zona segura:** x entre -3,5 e 3,5 e y entre -4,7 e 5,6 (`AREA`). Acima e abaixo disso o app cobre com a interface, a legenda e os botões.
-4. **Em [CANTO], o canto é seu:** nada entra no retângulo x de -3,64 a -0,98 e y de -4,74 a -1,19 (360 x 480 px no canto inferior esquerdo), em nenhum quadro, nem no primeiro. Desenhe em `self.area`, que nessas linhas é y acima de -0,89. A faixa à direita do canto (x > -0,7, y < -1,2) está livre para um elemento pequeno, se fizer falta.
+4. **Em [CANTO], o canto é seu:** você fica encostado no canto inferior esquerdo da tela, cortado no peito, tocando a borda de baixo e a esquerda: o retângulo x de -4 a -0,44 e y de -7,11 a -2,37 (480 x 640 px). Nada entra nele, em nenhum quadro, nem no primeiro. Desenhe em `self.area`, que nessas linhas é y acima de -2,07. A faixa à direita do canto (x de -0,2 a 3,5, y de -4,7 a -2,4) está livre para um elemento pequeno, se fizer falta.
 5. **Cena de [CANTO] é mais simples**: um elemento principal, menos movimento.
 6. **Grande e legível:** o assunto ocupa boa parte da área; nada encostado na borda.
 
@@ -86,7 +86,7 @@ Rode da raiz do repositório, como no `CLAUDE.md`:
 5. Ajuste e repita até ficar bom. Para ver as zonas, rode `HUMANIM_DEPURAR=1 humanim animar videos/<slug>/roteiro.md --linha N`: desenha a zona segura (cinza) e, em [CANTO], o seu canto (vermelho tracejado). Antes de montar, rode de novo sem a variável.
 6. No fim, `humanim animar videos/<slug>/roteiro.md` sem `--linha`: renderiza todas (até 3 ao mesmo tempo) e pula as que não mudaram (`cenas/render.json`). Mudar o `comum.py` ou o estilo renderiza de novo as linhas que dependem deles.
 
-Depois da gravação (`tempos.json` novo), rode `humanim animar videos/<slug>/roteiro.md` de novo: as durações reais entram sozinhas.
+Depois da gravação e do `humanim editar` (`tempos.json` e `edicao.json` novos), rode `humanim animar videos/<slug>/roteiro.md` de novo: as durações da fala editada (sem pausas, muletas e repetições) entram sozinhas. Elas costumam sair mais curtas que as gravadas: por isso as frações e o `self.ate("palavra")`, nunca segundos fixos.
 
 ## Armadilhas
 

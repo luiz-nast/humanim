@@ -1,14 +1,21 @@
-"""Lê roteiro.md e tempos.json: o fio de tudo."""
+"""Lê roteiro.md, tempos.json e edicao.json: o fio de tudo."""
+import hashlib
 import json
 import re
+import unicodedata
 from dataclasses import dataclass
 
 from .comum import Erro, relativo
 from .formato import FPS
 
 MARCA = re.compile(r"^\[(CARA|ANIM|CANTO)(?::\s*([^\]]*))?\]\s*(.*)$")
-PALAVRAS_POR_SEGUNDO = 2.5
+# Antes da gravação, a duração de cada fala é estimada pelas sílabas, com os números por extenso
+# ("0,78" são 11 sílabas, não 2 palavras), mais as pausas que o editar deixa na pontuação.
+SILABAS_POR_SEGUNDO = 5.5
+PAUSA_ESTIMADA = {"frase": 0.30, "virgula": 0.20}
 DURACAO_MINIMA = 1.5
+_NUMERO = re.compile(r"\d+(?:[.,]\d+)*%?")
+_DITO = re.compile(_NUMERO.pattern + r"(?!\w)|\w+")
 
 
 @dataclass
@@ -33,14 +40,66 @@ class Tempo:
     linha: int
     de: float
     ate: float
+    # Pedaços da gravação que ficam, em ordem, em segundos da gravação. Sem edição, um só: [(de, ate)].
+    # Com edicao.json, a fala sem pausas, muletas e repetições: de é o início do primeiro, ate o fim do último.
+    trechos: list = None
+
+    def __post_init__(self):
+        if self.trechos is None:
+            self.trechos = [(self.de, self.ate)]
 
     @property
     def duracao(self):
-        return self.ate - self.de
+        """Segundos que a linha ocupa no vídeo final: a soma dos trechos."""
+        return sum(b - a for a, b in self.trechos)
 
 
 def palavras(fala):
     return len(re.findall(r"\w+", fala))
+
+
+def silabas(palavra):
+    """Sílabas de uma palavra, contando os grupos de vogais (aproximado: "saída" dá 2)."""
+    p = unicodedata.normalize("NFD", palavra.lower())
+    p = "".join(c for c in p if unicodedata.category(c) != "Mn")
+    return max(1, len(re.findall(r"[aeiouy]+", p)))
+
+
+def ritmo(fala):
+    """Estimativa de quando cada palavra da fala começa: (inícios, total), em segundos.
+
+    `inícios` tem um valor por palavra de re.findall(r"\\w+", fala), a mesma divisão que
+    CenaHumanim.momento usa; `total` é a duração estimada da fala (sem a pausa depois da última palavra).
+    """
+    from .editar import numero  # aqui dentro: o editar importa este módulo
+
+    achados = list(_DITO.finditer(fala))
+    pesos = []  # (sílabas de cada palavra \w+ deste trecho, pausa depois dele)
+    for i, m in enumerate(achados):
+        bruto, partes = m.group(), re.findall(r"\w+", m.group())
+        if _NUMERO.fullmatch(bruto):
+            total = sum(silabas(p) for p in numero(bruto))
+            inteiro = sum(silabas(p) for p in numero(bruto.split(",")[0].rstrip("%")))
+            if "," in bruto:  # "zero vírgula" | "setenta e oito": a vírgula vai com a parte inteira
+                inteiro += silabas("vírgula")
+            cada = [min(inteiro, total)] + [0] * (len(partes) - 1)
+            cada[-1] += total - cada[0]
+        else:
+            cada = [silabas(p) for p in partes]
+        depois = fala[m.end():achados[i + 1].start() if i + 1 < len(achados) else len(fala)]
+        pausa = (PAUSA_ESTIMADA["frase"] if re.search(r"[.?!:…]", depois) else
+                 PAUSA_ESTIMADA["virgula"] if re.search(r"[,;—–]", depois) else 0.0)
+        pesos.append((cada, pausa if i + 1 < len(achados) else 0.0))
+    inicios, t = [], 0.0
+    for cada, pausa in pesos:
+        for s in cada:
+            inicios.append(t)
+            t += s / SILABAS_POR_SEGUNDO
+        t += pausa
+    if len(inicios) != len(re.findall(r"\w+", fala)):  # divisão diferente da do momento: volta ao uniforme
+        n = len(re.findall(r"\w+", fala))
+        inicios = [t * k / max(n, 1) for k in range(n)]
+    return inicios, t
 
 
 def falado(fala):
@@ -73,18 +132,20 @@ def ler_roteiro(pasta):
     return linhas
 
 
-def ler_tempos(pasta, linhas):
+def ler_tempos(pasta, linhas, editado=True):
     """Tempos de cada linha e se são estimados.
 
-    Com tempos.json (depois da gravação), são os reais, em segundos da gravação.
-    Sem ele, são estimados pelo tamanho da fala, um atrás do outro a partir do zero.
+    Com tempos.json (depois da gravação), são os reais, em segundos da gravação; com edicao.json
+    (depois do editar, e se ele é desta gravação), cada linha vira os trechos que a edição deixou.
+    Sem tempos.json, são estimados pelo ritmo da fala (sílabas e pausas, veja ritmo), um atrás do outro.
+    `editado=False` ignora o edicao.json (o gravar, para saber se a gravação está completa).
     """
     arquivo = pasta / "tempos.json"
     gravar = f"humanim gravar {relativo(pasta / 'roteiro.md')}"
     if not arquivo.exists():
         tempos, t = [], 0.0
         for linha in linhas:
-            d = max(DURACAO_MINIMA, palavras(linha.fala) / PALAVRAS_POR_SEGUNDO)
+            d = max(DURACAO_MINIMA, ritmo(linha.fala)[1])
             tempos.append(Tempo(linha.numero, round(t, 3), round(t + d, 3)))
             t += d
         return tempos, True
@@ -113,7 +174,59 @@ def ler_tempos(pasta, linhas):
     for t in tempos:
         if t.duracao <= 0:
             raise Erro(f"linha {t.linha} do tempos.json termina antes de começar. Grave de novo.")
+    if editado and (pasta / EDICAO).exists():
+        tempos = ler_edicao(pasta, tempos)
     return tempos, False
+
+
+EDICAO = "edicao.json"
+
+
+def assinatura_edicao(pasta):
+    """Identidade do que o editar leu: o tempos.json e a gravacao.webm (tamanho, começo e fim do arquivo).
+
+    O edicao.json guarda isto; se a gravação ou os tempos mudam depois, os trechos não valem mais.
+    """
+    tempos = hashlib.sha256((pasta / "tempos.json").read_bytes()).hexdigest()[:16]
+    gravacao = pasta / "gravacao.webm"
+    if not gravacao.exists():
+        return {"tempos": tempos, "gravacao": ""}
+    tamanho, bloco = gravacao.stat().st_size, 1 << 20
+    with open(gravacao, "rb") as f:
+        inicio = f.read(bloco)
+        f.seek(max(0, tamanho - bloco))
+        fim = f.read(bloco)
+    h = hashlib.sha256(str(tamanho).encode() + inicio + fim).hexdigest()[:16]
+    return {"tempos": tempos, "gravacao": h}
+
+
+def ler_edicao(pasta, tempos):
+    """Os tempos com os trechos do edicao.json, conferindo que ele é desta gravação e destes tempos."""
+    editar = f"humanim editar {relativo(pasta / 'gravacao.webm')}"
+    try:
+        dados = json.loads((pasta / EDICAO).read_text(encoding="utf-8"))
+        assinatura = {"tempos": dados["tempos"], "gravacao": dados["gravacao"]}
+        trechos = {int(d["linha"]): [(float(a), float(b)) for a, b in d["trechos"]] for d in dados["linhas"]}
+    except (ValueError, KeyError, TypeError, AttributeError) as e:
+        raise Erro(f"edicao.json não dá para ler ({type(e).__name__}: {e}). Rode de novo: {editar}") from None
+    if assinatura != assinatura_edicao(pasta):
+        raise Erro(f"edicao.json é de outra gravação: gravacao.webm ou tempos.json mudaram depois do último editar, "
+                   f"e os cortes não valem mais. Rode de novo: {editar}")
+    editados = []
+    for t in tempos:
+        if t.linha not in trechos:
+            raise Erro(f"edicao.json não tem a linha {t.linha}. Rode de novo: {editar}")
+        lista, anterior = trechos[t.linha], -1.0
+        for a, b in lista:
+            if b <= a or a < anterior - 1e-6 or a < 0:
+                raise Erro(f"edicao.json, linha {t.linha}: o trecho [{a}, {b}] está fora de ordem, invertido ou "
+                           f"encavalado com o anterior. Conserte à mão (trechos em ordem, [de, ate] com de < ate) "
+                           f"ou rode de novo: {editar}")
+            anterior = b
+        if not lista:
+            raise Erro(f"edicao.json, linha {t.linha}: nenhum trecho. Conserte à mão ou rode de novo: {editar}")
+        editados.append(Tempo(t.linha, lista[0][0], lista[-1][1], lista))
+    return editados
 
 
 def quadros(tempos):

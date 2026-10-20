@@ -18,7 +18,8 @@ from .roteiro import ler_roteiro, ler_tempos
 
 PAGINA = Path(__file__).with_name("teleprompter.html")
 PERFIL_CHROME = Path.home() / ".cache" / "humanim" / "chrome"
-GUARDAR = ["gravacao.webm", "tempos.json", "gravacao-tratada.webm"]
+# O que é de uma gravação e vai junto com ela para anteriores/ quando outra a substitui.
+GUARDAR = ["gravacao.webm", "tempos.json", "gravacao-tratada.webm", "edicao.json"]
 
 
 class Sessao:
@@ -130,7 +131,7 @@ def completa(pasta, linhas):
     if not (pasta / "gravacao.webm").exists() or not (pasta / "tempos.json").exists():
         return False
     try:
-        ler_tempos(pasta, linhas)
+        ler_tempos(pasta, linhas, editado=False)  # um edicao.json velho não torna a gravação incompleta
     except Erro:
         return False
     return True
@@ -147,7 +148,7 @@ def numero_livre(pasta):
 
 
 def guardar_anteriores(pasta):
-    """Move gravação, tempos e gravação tratada antigos para anteriores/, com o mesmo sufixo."""
+    """Move gravação, tempos, gravação tratada e edição antigos para anteriores/, com o mesmo sufixo."""
     velhos = [pasta / nome for nome in GUARDAR if (pasta / nome).exists()]
     if not velhos:
         return None
@@ -184,9 +185,10 @@ def resumo(pasta, linhas, tempos, regravadas, segundos, sufixo, guardada=False):
                      f"Grave de novo até o fim: humanim gravar {roteiro} (esta parcial vai para anteriores/).")
     else:
         texto[0] = "gravação salva: " + texto[0]
-        texto.append(f"Próximo: humanim animar {roteiro} (refaz as cenas com os tempos reais), depois "
-                     f"humanim tratar {relativo(pasta / 'gravacao.webm')} (em segundo plano), depois "
-                     f"humanim montar {relativo(pasta)}")
+        texto.append(f"Próximo: humanim editar {relativo(pasta / 'gravacao.webm')} (corta pausas, muletas e "
+                     f"repetições, e diz se alguma fala saiu diferente do roteiro), depois humanim animar {roteiro} "
+                     f"(refaz as cenas na duração da fala editada), humanim tratar "
+                     f"{relativo(pasta / 'gravacao.webm')} (em segundo plano) e humanim montar {relativo(pasta)}")
     return texto
 
 

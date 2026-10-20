@@ -8,8 +8,8 @@ import textwrap
 from pathlib import Path
 
 from .comum import Erro, ok, pasta_do_video, rodar, trabalho
-from .formato import CANTO, FPS, LARGURA
-from .roteiro import ler_roteiro, ler_tempos, quadros
+from .formato import CANTO, FPS, LARGURA, lados_soltos
+from .roteiro import EDICAO, ler_roteiro, ler_tempos, quadros
 
 L, A = 540, 960  # meio tamanho: sai rápido e basta para ver
 K = L / LARGURA
@@ -88,8 +88,13 @@ def main(args):
             entradas += ["-i", pasta / "cenas" / f"{cena}.mp4"]
             f = f"[{len(entradas) // 2 - 1}:v]trim=end_frame={n},setpts=PTS-STARTPTS,scale={L}:{A},setsar=1"
             if linha.marca == "CANTO":
+                # você no mesmo lugar do montar, encostado na tela: contorno só nos lados soltos
                 x, y, w, h = (round(c * K) for c in CANTO)
-                f += (f",drawbox={x}:{y}:{w}:{h}:black@0.45:fill,drawbox={x}:{y}:{w}:{h}:white@0.9:3,"
+                esq, cima, dir_, baixo = lados_soltos(*CANTO)
+                lados = [(x, y, 3, h)] * esq + [(x, y, w, 3)] * cima + [(x + w - 3, y, 3, h)] * dir_ + \
+                        [(x, y + h - 3, w, 3)] * baixo
+                f += (f",drawbox={x}:{y}:{w}:{h}:black@0.45:fill,"
+                      + "".join(f"drawbox={a}:{b}:{c}:{d}:white@0.9:fill," for a, b, c, d in lados)
                       + escrever(cena, 34, "white", f"{y + h // 2}-text_h/2", "você", x=f"{x + w // 2}-text_w/2"))
         elif linha.tem_animacao:
             f = (f"color=c=0x1c1414:s={L}x{A}:r={FPS},trim=end_frame={n},"
@@ -118,8 +123,9 @@ def main(args):
     html.write_text(MODELO.read_text(encoding="utf-8").replace("__DADOS__", embutido), encoding="utf-8")
 
     aberto = not args.nao_abrir and abrir(html)
-    ok(f"prévia em {os.path.relpath(html)} · {len(linhas)} linhas · {total:.1f} s · "
-       f"tempos {'estimados (pelo tamanho das falas)' if estimado else 'reais (tempos.json)'}"
+    origem = ("estimados (pelo tamanho das falas)" if estimado else
+              "da fala editada (edicao.json)" if (pasta / EDICAO).exists() else "reais (tempos.json)")
+    ok(f"prévia em {os.path.relpath(html)} · {len(linhas)} linhas · {total:.1f} s · tempos {origem}"
        + (" · aberta no navegador" if aberto else "" if args.nao_abrir else f" · abra no navegador: {html.as_uri()}"))
     if avisos:
         print(f"Falta animar {len(avisos)} linha(s):")
