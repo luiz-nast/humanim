@@ -65,6 +65,10 @@ SIBILO = 0.36  # e acima disto, o chiado do s, x, ch, f (fala); a respiração �
 # Respiração: som sem voz e sem chiado entre dois vales, de pelo menos RESPIRO. Mais curta que RESPIRO_LONGA,
 # também QUIETA dB abaixo da voz: a sílaba final sem voz ("limi-te", "clien-te" com o e mudo) é forte como a fala.
 RESPIRO, RESPIRO_LONGA, QUIETA = 0.10, 0.30, 10.0
+SOLTURA_TOPO, SOLTURA_SALTO = 6.0, 12.0  # dB: em 20 ms a vogal sem voz após p/t/k está perto do pico e longe do vale
+SOLTURA_DURA = 0.17  # s: a vogal sem voz após p/t/k é sílaba átona, mais curta que isto; a respiração dura mais
+VALE_RASO, VALE_JANELA = 6.0, 0.15  # muleta grudada: vale (dB) que a separa da palavra, procurado até s antes dela
+FUNDO = 3.0  # dB acima do mínimo de um vale que ainda são o fundo dele (o n inteiro de "né", o murmúrio do nasal)
 REPETIDA = 0.5  # casar a primeira cópia de uma repetição ("Vai prever. Vai prever calote") custa isto a mais
 ILHA = 2.0  # voltar a casar depois de 2+ palavras fora do roteiro no meio: emenda de duas tentativas, evitar
 CORTE_MINIMO = 0.1  # corte menor que isto não compensa o pulo
@@ -433,7 +437,11 @@ class Som:
         """Quadros de respiração. Cada som entre dois vales (corrida acima do limiar, sem tapar: a respiração
         encostada na palavra fica separada dela pelo vale) é respiração se é ruído (quase nenhum quadro de
         voz), sem o chiado do s/x/ch ("tóra-x", "gru-p-s" depois do p/t/k são fala), de pelo menos RESPIRO e,
-        se mais curto que RESPIRO_LONGA, QUIETA dB abaixo da voz. Vai até o fundo dos vales em volta."""
+        se mais curto que RESPIRO_LONGA, QUIETA dB abaixo da voz. E que não é a vogal sem voz depois do p/t/k
+        (a soltura da oclusiva, "cin-c(u)" no fim da frase), que tem o mesmo ruído grave da respiração: ela
+        nasce de uma vez do fechamento, que é curto (fala a menos de OCLUSIVA antes), e dura menos que
+        SOLTURA_DURA. Nascer de uma vez sozinho não basta: a respiração também pode começar rápido. Vai até o
+        fundo dos vales em volta."""
         resp, k, n = np.zeros(self.n, bool), 0, self.n
         while k < n:
             if not self.alto[k]:
@@ -443,9 +451,13 @@ class Som:
             while k < n and self.alto[k]:
                 k += 1
             db, zcr = self.db[a:k], self.zcr[a:k]
+            comeco = db[:2].max()
             if (k - a < round(RESPIRO / PASSO) or np.mean(zcr < VOZ) >= 0.15
                     or np.median(zcr[db >= db.max() - 10]) >= SIBILO
-                    or (k - a < round(RESPIRO_LONGA / PASSO) and db.max() > voz - QUIETA)):
+                    or (k - a < round(RESPIRO_LONGA / PASSO) and db.max() > voz - QUIETA)
+                    or (a > 0 and db.max() - comeco < SOLTURA_TOPO
+                        and comeco - self.db[max(0, a - 4):a].min() >= SOLTURA_SALTO
+                        and k - a < quadros(SOLTURA_DURA) and self.alto[max(0, a - quadros(OCLUSIVA)):a].any())):
                 continue
             i, j = a, k
             while i > 0 and fraco[i - 1] and self.db[i - 1] < self.db[i]:
@@ -614,6 +626,36 @@ class Som:
         de verdade de b, sem outro limite além dos de onset e offset (0 e 1e9: nenhum)."""
         return self.onset(b, 0) - self.offset(a, 1e9)
 
+    def vale(self, w):
+        """Onde começa a muleta w dita no embalo da palavra de antes, sem silêncio entre as duas ("dado-s|é",
+        "guarda|né"): o fundo do vale raso (VALE_RASO dB abaixo do som dos dois lados, a até 100 ms, mesmo
+        acima do limiar) mais perto do fim do som dela, até VALE_JANELA antes do começo que a transcrição dá.
+        Procura do fim (a pausa depois da muleta, ou a palavra seguinte) para trás, e não do tempo que a
+        transcrição dá à muleta: ele erra para os dois lados, e cedo cai na palavra de antes, que aí perderia
+        a última sílaba. Vale no meio do chiado ("clien-te-s|é": o s, acima do limiar e sem voz) vai até onde a
+        voz da muleta começa, que o s é da palavra; vale com voz ("simples|né": o n) volta até o começo do
+        fundo dele, que o n é da muleta. None se não tem: não há onde separar as duas sem comer uma."""
+        de = self.q(w.de)
+        fim = self.q(min(w.ate + VALE_JANELA, self.seguinte(w)))
+        while fim > de and not self.som[fim - 1]:
+            fim -= 1
+        if fim == de:  # nada de som da muleta até a pausa ou a palavra seguinte
+            return None
+        a, lado = self.q(w.de - VALE_JANELA), quadros(0.1)
+        for k in range(fim - 1, a - 1, -1):
+            if (0 < k < self.n - 1 and self.db[k] <= min(self.db[k - 1], self.db[k + 1])
+                    and self.db[max(0, k - lado):k].max() - self.db[k] >= VALE_RASO
+                    and self.db[k + 1:k + 1 + lado].max() - self.db[k] >= VALE_RASO):
+                fundo = self.db[k]
+                if self.zcr[k] < VOZ:  # fundo com voz (o n de "né", que é da muleta): até onde ele começa
+                    while k - 1 > a and self.zcr[k - 1] < VOZ and self.db[k - 1] <= fundo + FUNDO:
+                        k -= 1
+                elif self.alto[k]:  # no meio do chiado (o s, que é da palavra): até o último quadro sem voz
+                    while k + 1 < fim and self.zcr[k + 1] >= VOZ:
+                        k += 1
+                return k * PASSO
+        return None
+
     def conteudo(self, a, b):
         """O que tem entre a e b, sem palavra: 'respiracao' (ruído), 'muleta' (voz) ou 'silencio'."""
         ka, kb = self.q(a), self.q(b)
@@ -659,8 +701,8 @@ def alinhar(S, W, vizinhas=frozenset()):
     fora do roteiro (sem contar muleta), no meio, custa ILHA: é emendar o começo de uma tentativa com o
     fim da outra, que só vale se a última tentativa tem bem mais palavras erradas (pela transcrição) que a
     anterior. Palavra trocada não conta como volta ao roteiro (senão trocar em vez de sobrar pularia a
-    regra). `vizinhas`: tokens de palavras da linha vizinha, que só vêm para esta se casarem (no empate,
-    fica a palavra da própria linha).
+    regra). `vizinhas`: tokens de palavras da linha vizinha (ou da borda da janela, em trocadas_na_linha),
+    que só vêm para esta se casarem (no empate, fica a palavra da própria linha, ou a de dentro).
     """
     m, n = len(S), len(W)
     inf = float("inf")
@@ -738,15 +780,17 @@ def falados(ps):
     return W, dono
 
 
-def casadas(fala, ps, vizinhas=(), som=None):
+def casadas(fala, ps, vizinhas=(), som=None, alheias=()):
     """Índices das palavras de ps que o alinhamento com a fala casa (igual ou junta).
 
     Com `som`, também a vizinha que não casa (fora muleta) mas está grudada (sem pausa, pela energia) numa
     palavra desta linha: é a mesma frase, dita em cima da tecla ("quase não erra" com o Espaço antes do
     "erra"), ou fala desta linha que a transcrição errou ("A" no lugar de "Pra", com o R apertado depois de
-    recomeçar). E a que o alinhamento troca por uma palavra do roteiro que faltaria aqui, se a pausa entre
-    ela e esta linha é menor que a do outro lado ("aprende? Regras." no lugar de "Padrões.", com o Espaço
-    apertado na pausa da pergunta)."""
+    recomeçar). Menos as `alheias`, que a própria linha delas troca por uma palavra do roteiro dela: com as
+    linhas ditas emendadas, grudada não diz de qual é ("grupos. Segue" com o "Segue" ouvido "Sede"). E a que
+    o alinhamento troca por uma palavra do roteiro que faltaria aqui, se a pausa entre ela e esta linha é
+    menor que a do outro lado ("aprende? Regras." no lugar de "Padrões.", com o Espaço apertado na pausa da
+    pergunta)."""
     W, dono = falados(ps)
     tv = frozenset(j for j, k in enumerate(dono) if k in vizinhas)
     passos = alinhar(tokens(fala), W, tv)
@@ -764,11 +808,23 @@ def casadas(fala, ps, vizinhas=(), som=None):
                     continue
                 a, b = ps[min(i, v)], ps[max(i, v)]
                 dentro = som.vao(a, b)
-                if dentro < OCLUSIVA or (i in trocadas and dentro < som.pausa(ps[i], 1 if v < i else -1)):
+                if ((dentro < OCLUSIVA and i not in alheias)
+                        or (i in trocadas and dentro < som.pausa(ps[i], 1 if v < i else -1))):
                     casa.add(i)
                     mudou = True
                     break
     return casa
+
+
+def trocadas_na_linha(x):
+    """Índices das palavras da linha x que o alinhamento com a fala dela troca por uma palavra do roteiro. No
+    empate, a troca fica com a palavra de dentro da janela, não com a que começa a até FRONTEIRA do fim dela
+    (ou termina a até FRONTEIRA do começo), que pode ser da vizinha: "os loops. Segue" com o Espaço apertado
+    depois do "Segue" troca "grupos" por "loops", e não por "Segue" (que é da linha seguinte)."""
+    W, dono = falados(x.palavras)
+    borda = frozenset(j for j, k in enumerate(dono)
+                      if x.palavras[k].de > x.ate - FRONTEIRA or x.palavras[k].ate < x.de + FRONTEIRA)
+    return {dono[j0] for passo, _, _, j0, _ in alinhar(tokens(x.fala), W, borda) if passo == "trocada"}
 
 
 def redistribuir(linhas, palavras, som):
@@ -783,6 +839,7 @@ def redistribuir(linhas, palavras, som):
     meio = [(w.de + w.ate) / 2 for w in palavras]
     indice = {id(w): k for k, w in enumerate(palavras)}
     presas = {id(x.palavras[k]) for x in linhas for k in casadas(x.fala, x.palavras)}
+    trocas = {id(x.palavras[k]) for x in linhas for k in trocadas_na_linha(x)}
     dona = {}  # id da palavra que muda -> linha nova
     for n, x in enumerate(linhas):
         ant = linhas[n - 1].ate if n else -math.inf
@@ -816,7 +873,8 @@ def redistribuir(linhas, palavras, som):
         ks = sorted(set(antes + proprias + depois))
         ps = [palavras[k] for k in ks]
         vizinhas = {i for i, k in enumerate(ks) if k in antes or k in depois}
-        for i in casadas(x.fala, ps, vizinhas, som) & vizinhas:
+        alheias = {i for i in vizinhas if id(ps[i]) in trocas}
+        for i in casadas(x.fala, ps, vizinhas, som, alheias) & vizinhas:
             dona[id(ps[i])] = n
     if dona:
         for n, x in enumerate(linhas):
@@ -841,10 +899,10 @@ def decidir(linha, som):
                 trocadas.update(dono[j] for j in range(j0, j1))
                 diferencas.append({"tipo": "trocada", "roteiro": S[i0][1], "falado": W[j0][1],
                                    "parecido": round(parecido(S[i0][0], W[j0][0]), 2), "token": S[i0][0],
-                                   "certeza": linha.palavras[dono[j0]].prob})
+                                   "certeza": linha.palavras[dono[j0]].prob, "indices": [i0]})
         elif passo == "falta":
             faltas[dono[j0] if j0 < len(dono) else len(linha.palavras)] += 1
-            diferencas.append({"tipo": "faltando", "roteiro": S[i0][1], "token": S[i0][0]})
+            diferencas.append({"tipo": "faltando", "roteiro": S[i0][1], "token": S[i0][0], "indices": [i0]})
     for k, w in enumerate(linha.palavras):
         if "$" in w.texto:  # "R$ 1.500" transcrito: o tempo é o do número, e o "reais" é dito depois dele
             faltas[k + 1] += 1
@@ -890,9 +948,13 @@ def classificar(corrida, ant, prox, faltam, som, duvida=False):
             return ""
         # Grudada de um lado só, quase sem som próprio: é o fim (ou o começo) da palavra em que gruda que a
         # transcrição chamou de "e" ("árvo-re" + "e" na pausa da vírgula, "cli-entes" ouvido "e antes": o
-        # som não para entre as duas). Também fica. A muleta encostada na palavra ("dados é... mostram")
-        # tem som separado dela por um vale.
-        if min(antes, depois) < 0.06 and som.proprio(corrida, ant, prox) < 0.15:
+        # som não para entre as duas). Também fica. Grudada só na de antes, fica se a palavra termina com o que
+        # foi ouvido, ou se não tem nem um vale raso entre as duas (Som.vale) onde cortar: a muleta dita no
+        # embalo da palavra ("Os dados é... mostram", "guarda né... a chance") também não tem silêncio antes,
+        # e tem a pausa depois; ela sai, cortada nesse vale (editar_linha).
+        if (som.proprio(corrida, ant, prox) < 0.15
+                and (depois < 0.06 or (antes < 0.06 and (fim_da_palavra(ant, corrida)
+                                                         or som.vale(corrida[0]) is None)))):
             return ""
         return "muleta"
     if prox is not None:
@@ -914,6 +976,12 @@ def classificar(corrida, ant, prox, faltam, som, duvida=False):
     if min(antes, depois) >= 0.3:
         return "fora_do_roteiro"
     return ""
+
+
+def fim_da_palavra(w, corrida):
+    """Se o que a transcrição ouviu na corrida pode ser o fim da palavra w partida ("árvo-re" + "e")."""
+    ouvido = "".join(re.sub(r"(.)\1+", r"\1", t) for x in corrida for t in x.toks)
+    return fonetico(w.toks[-1]).endswith(fonetico(ouvido)) if w.toks and ouvido else False
 
 
 def editar_linha(linha, som, obstaculos, faltas, pontuacao):
@@ -940,6 +1008,11 @@ def editar_linha(linha, som, obstaculos, faltas, pontuacao):
     def limite_dir(t):
         return min([hi] + [som.inicio(o) for o in obstaculos if o.de >= t - 0.05 and o.ate > t])
 
+    def embalo(w, seguinte):  # o vale raso entre w e a seguinte, se ela é muleta dita no embalo de w (classificar)
+        if seguinte.fica or seguinte.corte != "muleta" or som.vao(w, seguinte) >= 0.06:
+            return None
+        return som.vale(seguinte)
+
     pedacos = []  # ((corte, onde a fala começa), (corte, onde a fala termina)) em segundos
     k0 = ficam[0]
     lim = limite_esq(ps[k0].de)
@@ -958,6 +1031,9 @@ def editar_linha(linha, som, obstaculos, faltas, pontuacao):
                                off_a + alvo / 2)
             ini_b = som.quieto(min(on_b - 0.02, max(on_b - alvo / 2 - 0.04, off_meio + 0.02)), on_b - 0.02,
                                on_b - alvo / 2)
+            raso = embalo(A, meio[0])
+            if raso is not None and raso - 0.02 > inicio[1]:  # sem silêncio entre A e a muleta: corta no vale
+                fim_a, off_a = raso, raso - 0.02
             pedacos.append((inicio, (fim_a, off_a)))
             inicio = (ini_b, on_b)
             continue
@@ -982,7 +1058,11 @@ def editar_linha(linha, som, obstaculos, faltas, pontuacao):
     off = som.offset(ps[kz], lim)
     if sum(faltas[kz + 1:]):
         off = estender_dir(som, off, min(lim, off + POR_FALTA * sum(faltas[kz + 1:]) + 0.2))
-    pedacos.append((inicio, (som.quieto(off + 0.02, max(off + 0.02, min(lim, off + FIM + 0.04)), off + FIM), off)))
+    fim = som.quieto(off + 0.02, max(off + 0.02, min(lim, off + FIM + 0.04)), off + FIM)
+    raso = embalo(ps[kz], ps[kz + 1]) if kz + 1 < len(ps) and not sum(faltas[kz + 1:]) else None
+    if raso is not None and raso - 0.02 > inicio[1]:  # muleta no embalo da última palavra: corta no vale
+        fim, off = raso, raso - 0.02
+    pedacos.append((inicio, (fim, off)))
     # Pedaço em que a fala acaba antes de começar não tem palavra que fica (o começo e o fim vieram de
     # palavras diferentes, com a transcrição errando o tempo): sai, e os dois cortes em volta viram um.
     certos = [p for p in pedacos if p[1][1] - p[0][1] > 0.02]
@@ -1107,6 +1187,7 @@ def agrupar(diferencas):
         if saida and saida[-1]["tipo"] == d["tipo"] and d["tipo"] != "sem_fala" and (
                 d.get("roteiro") is not None and saida[-1].get("roteiro") == d.get("roteiro")
                 and saida[-1].get("falado") == d.get("falado")):
+            saida[-1]["indices"] = saida[-1].get("indices", []) + d.get("indices", [])
             continue
         saida.append(dict(d))
     return saida
@@ -1164,10 +1245,6 @@ def main(args):
         linha.cortes = descrever_cortes(linha, linha.trechos, som, outros)
         linha.diferencas = agrupar(linha.diferencas)
     ouvidas = segunda_escuta(linhas, audio, pasta, assinatura["gravacao"], modelo)
-    for linha in linhas:
-        if linha.numero in ouvidas and ouvidas[linha.numero][1]:
-            for d in linha.diferencas:
-                d["conferida"] = True
 
     dados = {"versao": 1, **assinatura, "modelo": modelo, "fps": FPS, "linhas": []}
     for linha in linhas:
@@ -1177,7 +1254,8 @@ def main(args):
             "roteiro": linha.fala,
             "falado": " ".join(w.texto for w in linha.palavras),
             "fica": " ".join(w.texto for w in linha.palavras if w.fica),
-            "diferencas": [{k: v for k, v in d.items() if k != "token"} | {"importante": importante(d)}
+            "diferencas": [{k: v for k, v in d.items() if k not in ("token", "indices")}
+                           | {"importante": importante(d)}
                            for d in linha.diferencas],
             "cortes": linha.cortes,
         } | ({"segunda_escuta": {"ouvido": ouvidas[linha.numero][0], "bate": ouvidas[linha.numero][1]}}
@@ -1214,7 +1292,8 @@ def segunda_escuta(linhas, audio, pasta, assinatura, nome):
     A dica desfaz o erro da transcrição ("Aula" por "Olha", "nenhum porcento" por "nem 1%", "otazo" por
     "atraso") e não esconde erro de verdade: dito "três meses", "seis em dez", "16%", "0,28", "50%", "do
     Japão", "150 mil", "menos bagunça" ou sem o "não", com o roteiro certo como dica, o small e o turbo
-    escreveram o que foi dito. Devolve {linha: (o que ouviu, se bate com o roteiro)}; guarda em .trabalho/."""
+    escreveram o que foi dito. Marca como conferida a diferença que ela desfez. Devolve {linha: (o que
+    ouviu, se bate com o roteiro)}; guarda em .trabalho/."""
     duvidosas = [x for x in linhas if any(importante(d) for d in x.diferencas)
                  and not any(d["tipo"] == "sem_fala" for d in x.diferencas)]
     if not duvidosas or os.environ.get("HUMANIM_SEGUNDA_ESCUTA") == "0":  # 0: os testes do corte não precisam
@@ -1253,16 +1332,25 @@ def segunda_escuta(linhas, audio, pasta, assinatura, nome):
     for x in duvidosas:
         ouvido = guardado[chave(x)]
         S, W = tokens(x.fala), [(t, bruto, True) for t, bruto, _ in tokens(ouvido)]
-        restam = []
+        restam, certas = [], set()
         for passo, i0, i1, j0, j1 in alinhar(S, W):
-            if passo == "trocada":
+            if passo in ("igual", "junta"):
+                certas.update(range(i0, i1))
+            elif passo == "trocada":
                 restam.append({"tipo": "trocada", "roteiro": S[i0][1], "falado": W[j0][1], "token": S[i0][0],
                                "parecido": parecido(S[i0][0], W[j0][0])})
             elif passo == "falta":
                 restam.append({"tipo": "faltando", "roteiro": S[i0][1], "token": S[i0][0]})
             elif passo == "sobra" and not muleta(W[j0][0]):
                 restam.append({"tipo": "a_mais", "falado": W[j0][1], "token": W[j0][0]})
-        saida[x.numero] = (ouvido, not any(importante(d) for d in restam))
+        bate = not any(importante(d) for d in restam)
+        # A diferença da primeira escuta que a segunda desfez é da transcrição: com a linha batendo, todas; e,
+        # uma a uma, a palavra do roteiro que a segunda ouviu certa. A que só a segunda erra também não pede
+        # regravar (ela às vezes pula um pedaço da fala: "busca gulosa", que a primeira ouviu).
+        for d in x.diferencas:
+            if bate or (d.get("indices") and set(d["indices"]) <= certas):
+                d["conferida"] = True
+        saida[x.numero] = (ouvido, bate)
     return saida
 
 
@@ -1285,7 +1373,7 @@ def resumo(pasta, linhas, ouvidas=None):
                                if x.numero in ouvidas else ""))
         elif x.numero in ouvidas:
             pequenas.append(f"{x.numero} ({'; '.join(frase(d) for d in dif)}: ouvida de novo, com o roteiro como "
-                            f"dica, bate)")
+                            f"dica, {'bate' if ouvidas[x.numero][1] else 'as palavras em dúvida batem'})")
         elif dif:
             pequenas.append(f"{x.numero} ({'; '.join(frase(d) for d in dif)})")
     if regravar:
