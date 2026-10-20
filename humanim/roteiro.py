@@ -2,20 +2,14 @@
 import hashlib
 import json
 import re
-import unicodedata
 from dataclasses import dataclass
 
-from .comum import Erro, relativo
+from .comum import Erro, identidade, relativo
+from .fala import fracao_na_fala, ritmo  # noqa: F401 — fracao_na_fala: o estilo e o contar importam daqui
 from .formato import FPS
 
 MARCA = re.compile(r"^\[(CARA|ANIM|CANTO)(?::\s*([^\]]*))?\]\s*(.*)$")
-# Antes da gravação, a duração de cada fala é estimada pelas sílabas, com os números por extenso
-# ("0,78" são 11 sílabas, não 2 palavras), mais as pausas que o editar deixa na pontuação.
-SILABAS_POR_SEGUNDO = 5.5
-PAUSA_ESTIMADA = {"frase": 0.30, "virgula": 0.20}
-DURACAO_MINIMA = 1.5
-_NUMERO = re.compile(r"\d+(?:[.,]\d+)*%?")
-_DITO = re.compile(_NUMERO.pattern + r"(?!\w)|\w+")
+DURACAO_MINIMA = 1.5  # segundos: a menor duração estimada de uma fala (fala.ritmo estima o resto)
 
 
 @dataclass
@@ -56,50 +50,6 @@ class Tempo:
 
 def palavras(fala):
     return len(re.findall(r"\w+", fala))
-
-
-def silabas(palavra):
-    """Sílabas de uma palavra, contando os grupos de vogais (aproximado: "saída" dá 2)."""
-    p = unicodedata.normalize("NFD", palavra.lower())
-    p = "".join(c for c in p if unicodedata.category(c) != "Mn")
-    return max(1, len(re.findall(r"[aeiouy]+", p)))
-
-
-def ritmo(fala):
-    """Estimativa de quando cada palavra da fala começa: (inícios, total), em segundos.
-
-    `inícios` tem um valor por palavra de re.findall(r"\\w+", fala), a mesma divisão que
-    CenaHumanim.momento usa; `total` é a duração estimada da fala (sem a pausa depois da última palavra).
-    """
-    from .editar import numero  # aqui dentro: o editar importa este módulo
-
-    achados = list(_DITO.finditer(fala))
-    pesos = []  # (sílabas de cada palavra \w+ deste trecho, pausa depois dele)
-    for i, m in enumerate(achados):
-        bruto, partes = m.group(), re.findall(r"\w+", m.group())
-        if _NUMERO.fullmatch(bruto):
-            total = sum(silabas(p) for p in numero(bruto))
-            inteiro = sum(silabas(p) for p in numero(bruto.split(",")[0].rstrip("%")))
-            if "," in bruto:  # "zero vírgula" | "setenta e oito": a vírgula vai com a parte inteira
-                inteiro += silabas("vírgula")
-            cada = [min(inteiro, total)] + [0] * (len(partes) - 1)
-            cada[-1] += total - cada[0]
-        else:
-            cada = [silabas(p) for p in partes]
-        depois = fala[m.end():achados[i + 1].start() if i + 1 < len(achados) else len(fala)]
-        pausa = (PAUSA_ESTIMADA["frase"] if re.search(r"[.?!:…]", depois) else
-                 PAUSA_ESTIMADA["virgula"] if re.search(r"[,;—–]", depois) else 0.0)
-        pesos.append((cada, pausa if i + 1 < len(achados) else 0.0))
-    inicios, t = [], 0.0
-    for cada, pausa in pesos:
-        for s in cada:
-            inicios.append(t)
-            t += s / SILABAS_POR_SEGUNDO
-        t += pausa
-    if len(inicios) != len(re.findall(r"\w+", fala)):  # divisão diferente da do momento: volta ao uniforme
-        n = len(re.findall(r"\w+", fala))
-        inicios = [t * k / max(n, 1) for k in range(n)]
-    return inicios, t
 
 
 def falado(fala):
@@ -189,15 +139,7 @@ def assinatura_edicao(pasta):
     """
     tempos = hashlib.sha256((pasta / "tempos.json").read_bytes()).hexdigest()[:16]
     gravacao = pasta / "gravacao.webm"
-    if not gravacao.exists():
-        return {"tempos": tempos, "gravacao": ""}
-    tamanho, bloco = gravacao.stat().st_size, 1 << 20
-    with open(gravacao, "rb") as f:
-        inicio = f.read(bloco)
-        f.seek(max(0, tamanho - bloco))
-        fim = f.read(bloco)
-    h = hashlib.sha256(str(tamanho).encode() + inicio + fim).hexdigest()[:16]
-    return {"tempos": tempos, "gravacao": h}
+    return {"tempos": tempos, "gravacao": identidade(gravacao) if gravacao.exists() else ""}
 
 
 def ler_edicao(pasta, tempos):

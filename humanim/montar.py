@@ -4,27 +4,27 @@ O áudio é sempre a voz da gravação; o roteiro só decide a imagem de cada li
 linha é a soma dos seus trechos: vídeo e áudio cortados no mesmo quadro, com um crossfade de 10 ms
 na emenda do áudio e, no [CARA], um zoom que alterna a cada pulo para o corte parecer troca de plano.
 """
-import json
 import subprocess
 from dataclasses import dataclass
 
 import numpy as np
 
-from .animar import assinatura
-from .comum import Erro, duracao, ok, pasta_do_video, relativo, rodar, trabalho
-from .formato import ALTURA, CANTO, FPS, LARGURA, lados_soltos
+from .animar import ler_feitas, motivo_da_cena, por_motivo
+from .comum import (AUDIO_DO_ZERO, VIDEO_DO_ZERO, Erro, contar_quadros, duracao, identidade, ok, pasta_do_video,
+                    relativo, rodar, trabalho)
+from .formato import ALTURA, CANTO, FAIXA_TOPO, FPS, LARGURA, ZOOM, lados_soltos
 from .roteiro import EDICAO, ler_roteiro, ler_tempos, quadros
-from .tratar import assinatura as assinatura_gravacao, fonte_da_tratada
+from .tratar import fonte_da_tratada, tratar_rodando
 
 BORDA = 4  # contorno claro nos lados do [CANTO] que não encostam na tela, quando a gravação tem fundo
 X264 = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(FPS)]
 SR = 48000
 CROSSFADE = 480  # amostras (10 ms) de crossfade em cada emenda do áudio: não estala e não muda a duração
-ZOOM = 1.12  # jump cut no [CARA]: alterna 100% e 112%
-# Altura (fração) que fica parada no zoom: a borda de baixo da faixa de cima que a interface do app cobre
-# (200 de 1920 px, a que o teleprompter manda deixar a cabeça abaixo). Assim o zoom só cresce para baixo e
-# nada que estava fora da faixa entra embaixo dela.
-ALTURA_ZOOM = 200 / ALTURA
+SOBRA_AUDIO = 0.5  # segundos de silêncio no fim do wav: o último trecho pode pegar meio crossfade além do fim
+# Altura (fração) que fica parada no zoom (formato.ZOOM): a borda de baixo da faixa de cima que a interface do
+# app cobre (a que o teleprompter manda deixar a cabeça abaixo). Assim o zoom só cresce para baixo e nada que
+# estava fora da faixa entra embaixo dela.
+ALTURA_ZOOM = FAIXA_TOPO / ALTURA
 FOLGA_CABECA = 0.06  # no [CANTO] sem fundo, folga acima da cabeça (fração da altura da gravação)
 
 
@@ -36,33 +36,13 @@ class Peca:
     zoom: float = 1.0
 
 
-def contar_quadros(arquivo):
-    saida = rodar(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_packets",
-                   "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", arquivo],
-                  f"contar quadros de {arquivo}")
-    return int(saida.strip().split(",")[0])
-
-
 def conferir_cenas(pasta, linhas, contagens):
     """Toda linha com animação precisa do clipe que o último animar fez da cena atual, com os quadros da fala."""
-    arquivo = pasta / "cenas" / "render.json"
-    feitas = json.loads(arquivo.read_text(encoding="utf-8")) if arquivo.exists() else {}
-    problemas = []
-    for linha, pede in zip(linhas, contagens):
-        if not linha.tem_animacao:
-            continue
-        cena, clipe = pasta / "cenas" / f"{linha.cena}.py", pasta / "cenas" / f"{linha.cena}.mp4"
-        if not clipe.exists():
-            problemas.append((linha.numero, f"falta cenas/{linha.cena}.mp4" + ("" if cena.exists() else
-                              f" e a própria cena cenas/{linha.cena}.py: escreva-a com a skill cenas")))
-        elif abs((tem := contar_quadros(clipe)) - pede) > 1:
-            problemas.append((linha.numero, f"a animação está desatualizada ({tem} quadros, a fala pede {pede})"))
-        elif not cena.exists() or feitas.get(linha.cena) != {"hash": assinatura(cena, linha), "quadros": pede}:
-            problemas.append((linha.numero, f"cenas/{linha.cena}.mp4 não é da cena atual: a cena, o comum.py, o estilo "
-                                            f"ou a fala mudaram depois do último animar, ele falhou nesta linha, "
-                                            f"ou ela saiu com HUMANIM_DEPURAR"))
+    feitas = ler_feitas(pasta)
+    problemas = [(linha.numero, motivo) for linha, pede in zip(linhas, contagens)
+                 if linha.tem_animacao and (motivo := motivo_da_cena(pasta, linha, pede, feitas))]
     if problemas:
-        texto = "\n".join(f"linha {n}: {p}." for n, p in problemas)
+        texto = por_motivo(problemas)
         opcoes = " ".join(f"--linha {n}" for n, _ in problemas)
         raise Erro(f"{texto}\nRode humanim animar {relativo(pasta / 'roteiro.md')} {opcoes}")
 
@@ -72,7 +52,11 @@ def escolher_gravacao(pasta):
     original, tratada = pasta / "gravacao.webm", pasta / "gravacao-tratada.webm"
     if not original.exists():
         raise Erro(f"falta gravacao.webm em {pasta}. Grave primeiro: humanim gravar {relativo(pasta / 'roteiro.md')}")
-    if tratada.exists() and fonte_da_tratada(tratada) == assinatura_gravacao(original):
+    if pid := tratar_rodando(pasta):
+        raise Erro(f"o tratar ainda está rodando nesta pasta (processo {pid}): montar agora sairia com o fundo, "
+                   f"e são dois processos pesados ao mesmo tempo. Espere o OK dele e rode de novo: "
+                   f"humanim montar {relativo(pasta)}")
+    if tratada.exists() and fonte_da_tratada(tratada) == identidade(original):
         return tratada, True, ""
     if tratada.exists():
         return original, False, ("\nAtenção: gravacao-tratada.webm não é desta gravacao.webm (é de outra gravação "
@@ -91,11 +75,11 @@ def normalizar(pasta, gravacao, com_alfa):
     video, audio = t / "gravacao-30fps.mkv", t / "gravacao.wav"
     decodificador = ["-c:v", "libvpx-vp9"] if com_alfa else []  # sem isso o alfa do VP9 some
     rodar(["ffmpeg", "-nostdin", "-y", "-v", "error", *decodificador, "-i", gravacao, "-map", "0:v:0",
-           "-vf", f"fps={FPS}:start_time=0,crop='trunc(min(iw,ih*3/4)/2)*2':'trunc(min(ih,iw*4/3)/2)*2'",
+           "-vf", f"{VIDEO_DO_ZERO},crop='trunc(min(iw,ih*3/4)/2)*2':'trunc(min(ih,iw*4/3)/2)*2'",
            "-c:v", "ffv1", "-pix_fmt", "yuva420p" if com_alfa else "yuv420p", video],
           f"normalizar o vídeo de {gravacao.name}")
     rodar(["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", pasta / "gravacao.webm", "-map", "0:a:0",
-           "-af", "aresample=async=1:first_pts=0,apad=pad_dur=0.5", "-ar", "48000", audio],
+           "-af", f"{AUDIO_DO_ZERO},apad=pad_dur={SOBRA_AUDIO}", "-ar", str(SR), audio],
           "extrair o áudio de gravacao.webm (ela tem áudio?)")
     return video, audio
 
@@ -259,7 +243,7 @@ def main(args):
     conferir_cenas(pasta, linhas, contagens)
 
     video, audio = normalizar(pasta, gravacao, com_alfa)
-    fim_video, fim_audio = contar_quadros(video) / FPS, duracao(audio) - 0.5
+    fim_video, fim_audio = contar_quadros(video) / FPS, duracao(audio) - SOBRA_AUDIO
     for t in tempos:
         if t.ate > min(fim_video, fim_audio) + 0.25:
             raise Erro(f"linha {t.linha} termina em {t.ate:.2f}s no tempos.json, mas a gravação tem "
@@ -299,5 +283,5 @@ def main(args):
         fala = "fala SEM edição"
         aviso += (f"\nAtenção: sem edicao.json, a fala entra como foi gravada (pausas, muletas e repetições "
                   f"junto). Para cortar: humanim editar {relativo(pasta / 'gravacao.webm')} e monte de novo.")
-    ok(f"{saida} montado: {total / FPS:.2f}s, {len(linhas)} linhas ({por_marca}), gravação {fundo}, {fala}.{aviso}\n"
-       f"Próximo: humanim frames {relativo(saida)} e olhe as imagens em frames/.")
+    ok(f"{relativo(saida)} montado: {total / FPS:.2f}s, {len(linhas)} linhas ({por_marca}), gravação {fundo}, "
+       f"{fala}.{aviso}\nPróximo: humanim frames {relativo(saida)} e olhe as imagens em frames/.")

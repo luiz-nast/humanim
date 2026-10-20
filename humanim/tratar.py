@@ -5,6 +5,8 @@ Lê gravacao.webm, passa quadro a quadro no RVM e escreve gravacao-tratada.webm
 o segundo t da tratada é o segundo t da original, como no tempos.json.
 """
 import json
+import os
+import shutil
 import subprocess
 import time
 import urllib.request
@@ -12,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .comum import RAIZ, Erro, duracao, ok, pasta_do_video, rodar, trabalho
+from .comum import RAIZ, VIDEO_DO_ZERO, Erro, duracao, identidade, ok, pasta_do_video, relativo, rodar, trabalho
 from .formato import FPS
 
 MODELO = RAIZ / "modelos" / "rvm_mobilenetv3_fp32.onnx"
@@ -22,13 +24,7 @@ URL = "https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/r
 # (a tabela dele para retrato/meio-corpo), 0,25 em 1920x1080.
 LADO_REDUZIDO = 480
 SAIDAS = ["fgr", "pha", "r1o", "r2o", "r3o", "r4o"]
-
-
-def curto(p):
-    try:
-        return p.relative_to(RAIZ)
-    except ValueError:
-        return p
+ESPERA_REDE = 30  # segundos sem resposta da rede no download do modelo: aí desiste com ERRO, não fica parado
 
 
 def fim(log):
@@ -36,9 +32,21 @@ def fim(log):
 
 
 def assinatura(gravacao):
-    """Identidade da gravação original. A tratada guarda a de quem veio, e o montar confere antes de usar."""
-    st = gravacao.stat()
-    return f"{st.st_size}-{st.st_mtime_ns}"
+    """Identidade da gravação original (a mesma do edicao.json: comum.identidade). A tratada a guarda, e o
+    montar confere antes de usar."""
+    return identidade(gravacao)
+
+
+def tratar_rodando(pasta):
+    """O processo do tratar que está rodando nesta pasta, ou None. O tratar anota o dele em .trabalho/tratar.pid
+    enquanto roda; o montar confere, para não montar com fundo nem rodar junto."""
+    try:
+        pid = int((pasta / ".trabalho" / "tratar.pid").read_text())
+        comando = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except (OSError, ValueError):
+        return None
+    # o número pode ter ficado de um tratar morto e voltado em outro programa: confere o subcomando
+    return pid if b"\0tratar\0" in comando else None
 
 
 def fonte_da_tratada(tratada):
@@ -51,40 +59,63 @@ def fonte_da_tratada(tratada):
 
 def carregar_modelo():
     if not MODELO.exists():
-        print(f"baixando o modelo de fundo (RVM mobilenetv3, 15 MB) para {curto(MODELO)} ...", flush=True)
+        print(f"baixando o modelo de fundo (RVM mobilenetv3, 15 MB) para {relativo(MODELO)} ...", flush=True)
         MODELO.parent.mkdir(exist_ok=True)
         parcial = MODELO.with_suffix(".parcial")
         try:
-            urllib.request.urlretrieve(URL, parcial)
-        except OSError as e:
-            raise Erro(f"não consegui baixar o modelo ({e}). Confira a internet ou baixe {URL} para {MODELO}.")
+            with urllib.request.urlopen(URL, timeout=ESPERA_REDE) as r, open(parcial, "wb") as f:
+                shutil.copyfileobj(r, f)
+        except OSError as e:  # sem rede, rede parada (timeout), disco cheio
+            parcial.unlink(missing_ok=True)
+            raise Erro(f"não consegui baixar o modelo ({e}). Confira a internet e rode de novo, ou baixe {URL} "
+                       f"para {relativo(MODELO)}.") from None
         parcial.replace(MODELO)
-    import onnxruntime as ort
+    try:
+        import onnxruntime as ort
+    except ImportError:
+        raise Erro("falta o onnxruntime no ambiente do humanim. Instale: "
+                   "uv pip install -p .venv/bin/python -e .") from None
     opcoes = ort.SessionOptions()
     opcoes.log_severity_level = 3
-    return ort.InferenceSession(str(MODELO), opcoes, providers=["CPUExecutionProvider"])
+    try:
+        return ort.InferenceSession(str(MODELO), opcoes, providers=["CPUExecutionProvider"])
+    except Exception as e:  # noqa: BLE001 — arquivo corrompido ou pela metade: vira um ERRO legível
+        raise Erro(f"o modelo de fundo {relativo(MODELO)} não abriu ({str(e)[:200]}): deve estar corrompido. Apague-o "
+                   f"e rode de novo, que ele baixa sozinho: rm {relativo(MODELO)}") from None
 
 
 def main(args):
     pasta = pasta_do_video(args.gravacao)
+    marca = trabalho(pasta) / "tratar.pid"
+    if (pid := tratar_rodando(pasta)) and pid != os.getpid():
+        raise Erro(f"já tem um tratar rodando nesta pasta (processo {pid}). Espere o OK dele.")
+    marca.write_text(str(os.getpid()))
+    try:
+        tratar(pasta, args)
+    finally:
+        marca.unlink(missing_ok=True)
+
+
+def tratar(pasta, args):
     dada = Path(args.gravacao) if args.gravacao else None
     entrada = dada.resolve() if dada and dada.suffix else pasta / "gravacao.webm"
     if not entrada.exists():
-        raise Erro(f"{curto(entrada)} não existe. Grave primeiro: humanim gravar {curto(pasta)}/roteiro.md")
+        raise Erro(f"{relativo(entrada)} não existe. Grave primeiro: humanim gravar {relativo(pasta / 'roteiro.md')}")
     if entrada.stem.endswith("-tratada"):
-        raise Erro(f"{entrada.name} já é a tratada. Passe a gravação original: humanim tratar {curto(pasta)}/gravacao.webm")
+        raise Erro(f"{entrada.name} já é a tratada. Passe a gravação original: humanim tratar "
+                   f"{relativo(pasta / 'gravacao.webm')}")
     saida = entrada.with_name(f"{entrada.stem}-tratada.webm")
     antes = entrada.stat()
     fonte = assinatura(entrada)
     if saida.exists() and fonte_da_tratada(saida) == fonte:
-        ok(f"{curto(saida)} já está tratada (é desta {entrada.name}). Para refazer, apague-a.")
+        ok(f"{relativo(saida)} já está tratada (é desta {entrada.name}). Para refazer, apague-a.")
         return
 
     fluxos = json.loads(rodar(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,width,height",
                                "-of", "json", entrada], f"ffprobe em {entrada.name}"))["streams"]
     video = next((f for f in fluxos if f["codec_type"] == "video"), None)
     if not video:
-        raise Erro(f"{curto(entrada)} não tem vídeo. Grave de novo: humanim gravar {curto(pasta)}/roteiro.md")
+        raise Erro(f"{relativo(entrada)} não tem vídeo. Grave de novo: humanim gravar {relativo(pasta / 'roteiro.md')}")
     tem_audio = any(f["codec_type"] == "audio" for f in fluxos)
     w, h = video["width"], video["height"]
     total = round(duracao(entrada) * FPS)
@@ -98,7 +129,7 @@ def main(args):
     # quadro se o vídeo começa depois do áudio, o fps tapa os buracos do VFR e o scale segura
     # mudança de resolução no meio da gravação.
     dec = subprocess.Popen(["ffmpeg", "-nostdin", "-v", "error", "-i", entrada, "-map", "0:v:0",
-                            "-vf", f"fps={FPS}:start_time=0,scale={w}:{h}",
+                            "-vf", f"{VIDEO_DO_ZERO},scale={w}:{h}",
                             "-f", "rawvideo", "-pix_fmt", "gbrpf32le", "pipe:1"],
                            stdout=subprocess.PIPE, stderr=log_dec.open("w"))
     enc = subprocess.Popen(["ffmpeg", "-nostdin", "-v", "error", "-y",
@@ -131,11 +162,11 @@ def main(args):
             dec.kill()  # o codificador morreu; o log dele diz por quê
         erro_dec, erro_enc = dec.wait(), enc.wait()
         if n == 0:
-            raise Erro(f"nenhum quadro saiu de {curto(entrada)}. Grave de novo. ffmpeg:\n{fim(log_dec)}")
+            raise Erro(f"nenhum quadro saiu de {relativo(entrada)}. Grave de novo. ffmpeg:\n{fim(log_dec)}")
         if erro_enc:
             raise Erro(f"o ffmpeg não conseguiu escrever {saida.name}:\n{fim(log_enc)}")
         if erro_dec:
-            raise Erro(f"o ffmpeg parou no meio de {curto(entrada)} (quadro {n} de ~{total}):\n{fim(log_dec)}")
+            raise Erro(f"o ffmpeg parou no meio de {relativo(entrada)} (quadro {n} de ~{total}):\n{fim(log_dec)}")
     except BaseException:
         dec.kill()
         enc.kill()
@@ -146,9 +177,10 @@ def main(args):
     agora = entrada.stat() if entrada.exists() else None
     if not agora or (agora.st_ino, agora.st_size, agora.st_mtime_ns) != (antes.st_ino, antes.st_size, antes.st_mtime_ns):
         parcial.unlink(missing_ok=True)
-        raise Erro(f"{curto(entrada)} mudou enquanto o tratar rodava (gravaram de novo?): nada foi salvo. "
-                   f"Rode de novo: humanim tratar {curto(entrada)}")
+        raise Erro(f"{relativo(entrada)} mudou enquanto o tratar rodava (gravaram de novo?): nada foi salvo. "
+                   f"Rode de novo: humanim tratar {relativo(entrada)}")
     parcial.replace(saida)
     sem_audio = "" if tem_audio else " ATENÇÃO: a gravação não tem áudio."
-    ok(f"{curto(saida)}: {n / FPS:.1f}s, {n} quadros a {FPS} fps, com transparência. "
-       f"Fundo tirado a {n / segundos:.1f} quadros/s ({segundos:.0f}s).{sem_audio}")
+    ok(f"{relativo(saida)}: {n / FPS:.1f}s, {n} quadros a {FPS} fps, com transparência. "
+       f"Fundo tirado a {n / segundos:.1f} quadros/s ({segundos:.0f}s).{sem_audio} "
+       f"Próximo: humanim montar {relativo(pasta)}")

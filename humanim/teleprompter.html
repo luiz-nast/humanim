@@ -17,12 +17,9 @@
   #aviso.erro { color: #ff6b6b; font-size: clamp(22px, 2vw, 34px); }
   #camera { position: absolute; right: 24px; bottom: 24px; width: 260px; border-radius: 8px; overflow: hidden; }
   #previa { display: block; width: 100%; transform: scaleX(-1); opacity: .8; background: #111; }
-  /* O que o vídeo usa: no [CARA], a faixa 9:16 do meio do quadro 16:9 (31,64% da largura), que no plano
-     com zoom de 112% (montar.ZOOM) fica 1,12 vez mais estreita: o retângulo é essa, a que aparece nos dois
-     planos (28,25%). O topo dela (200 de 1920 px) fica embaixo da interface do app; o zoom não mexe nele. */
-  #quadro { position: absolute; top: 0; bottom: 0; left: 35.875%; width: 28.25%; box-sizing: border-box;
-    border: 2px solid #ffd60a; box-shadow: 0 0 0 400px rgba(0, 0, 0, .55);
-    background: linear-gradient(rgba(0, 0, 0, .6) 10.4%, transparent 10.4%); }
+  /* O retângulo amarelo é o que o [CARA] usa (largura e fundo em quadro(), com os números do formato.py). */
+  #quadro { position: absolute; top: 0; bottom: 0; box-sizing: border-box;
+    border: 2px solid #ffd60a; box-shadow: 0 0 0 400px rgba(0, 0, 0, .55); }
   #mic { height: 6px; background: #222; }
   #nivel { height: 100%; width: 0; background: #34c759; }
   #mudo { display: none; position: absolute; right: 24px; bottom: 190px; width: 260px; font-size: 16px;
@@ -44,11 +41,34 @@
 <script>
 const $ = id => document.getElementById(id);
 const TIPOS = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+const FORMATO = __FORMATO__;  // do formato.py: a faixa de cima que o app cobre (fração da altura) e o zoom do [CARA]
 // preparando → pronto → contando → gravando → salvando → fim (ou cancelado, erro)
 let estado = 'preparando', falas = [], atual = 0, de = [], ate = [], regravadas = new Set();
-let stream, rec, t0 = 0, fila = Promise.resolve(), falhou = null;
+let stream, rec, t0 = 0, fila = Promise.resolve(), falhou = null, motivoParada = '';
 
 const agora = () => (performance.now() - t0) / 1000;
+
+// O [CARA] usa a faixa 9:16 do meio do quadro; no plano com zoom ela fica FORMATO.zoom vez mais estreita e
+// mais baixa. O retângulo é a largura que aparece nos dois planos; a faixa escura de cima fica embaixo da
+// interface do app (o zoom não mexe nela) e a amarelada de baixo só aparece no plano sem zoom.
+function quadro(aspecto = 16 / 9) {
+  const z = FORMATO.zoom, cima = FORMATO.faixa * 100;
+  const w = Math.min(1, 9 / 16 / aspecto) * 100 / z, baixo = ((1 - 1 / z) * FORMATO.faixa + 1 / z) * 100;
+  Object.assign($('quadro').style, {width: `${w}%`, left: `${(100 - w) / 2}%`,
+    background: `linear-gradient(rgba(0, 0, 0, .6) ${cima}%, transparent ${cima}%), ` +
+                `linear-gradient(transparent ${baixo}%, rgba(255, 214, 10, .22) ${baixo}%)`});
+}
+quadro();
+
+const lista = () => falas.slice(0, atual + 1).map((f, i) => ({linha: f.linha, de: de[i], ate: ate[i]}));
+// Cada Espaço e R vai na hora para o humanim: se esta janela travar ou cair, ele guarda a tomada com os tempos.
+function marcar() {
+  fetch('/marca', {method: 'POST', body: JSON.stringify({tempos: lista(), regravadas: [...regravadas]})}).catch(() => {});
+}
+// Sinal de vida: sem ele por 2 min (sem gravar) ou sem pedaço da gravação por 10 s, o humanim encerra com ERRO.
+setInterval(() => {
+  if (!['fim', 'erro', 'cancelado'].includes(estado)) fetch('/vivo', {method: 'POST'}).catch(() => {});
+}, 5000);
 
 function aviso(texto, classe = '') { $('aviso').textContent = texto; $('aviso').className = classe; }
 
@@ -96,12 +116,15 @@ async function preparar() {
   } catch (e) { return erro(mensagemCamera(e)); }
   if (estado !== 'preparando') return desligar();  // Esc enquanto ligava
   $('previa').srcObject = stream;
-  $('previa').onloadedmetadata = () => {  // câmera que não é 16:9: a faixa usada muda de largura
-    const v = $('previa'), w = Math.min(1, v.videoHeight * 9 / 16 / v.videoWidth) * 100 / 1.12;  // ZOOM
-    Object.assign($('quadro').style, {width: `${w}%`, left: `${(100 - w) / 2}%`});
-  };
+  $('previa').onloadedmetadata = () => quadro($('previa').videoWidth / $('previa').videoHeight);  // câmera não 16:9
+  stream.getTracks().forEach(t => t.addEventListener('ended', () => {  // desconectou (o stop() não chama isto)
+    motivoParada = motivoParada || `${t.kind === 'audio' ? 'o microfone' : 'a câmera'} desligou`;
+  }));
   rec = new MediaRecorder(stream, {mimeType: TIPOS.find(t => MediaRecorder.isTypeSupported(t)),
                                    videoBitsPerSecond: 6e6, audioBitsPerSecond: 128e3});
+  rec.onerror = e => {
+    motivoParada = 'erro no gravador do navegador: ' + ((e.error && (e.error.message || e.error.name)) || 'sem detalhe');
+  };
   rec.ondataavailable = e => {
     const pedaco = e.data;
     if (pedaco.size) fila = fila.then(() => falhou || postar('/pedaco', pedaco).catch(err => {
@@ -109,7 +132,7 @@ async function preparar() {
       erro('A gravação parou de chegar no humanim: ' + err.message);
     }));
   };
-  rec.onstart = () => { t0 = performance.now(); contar(3); };
+  rec.onstart = () => contar(3);
   rec.onstop = salvar;
   estado = 'pronto';
   aviso('Espaço para começar');
@@ -140,6 +163,7 @@ function contar(n) {
     estado = 'gravando';
     document.body.className = 'gravando';
     aviso('');
+    marcar();
     return;
   }
   aviso(String(n), 'contagem');
@@ -151,15 +175,18 @@ async function espaco() {
     estado = 'contando';
     aviso('3', 'contagem');
     try { await postar('/inicio'); } catch (e) { return erro('O humanim não respondeu: ' + e.message, false); }
-    if (estado === 'contando') rec.start(1000);
+    // O zero do relógio é o start(), não o evento 'start': ele chega uns 120 ms depois, e o vídeo gravado
+    // começa no start(). Zerando no evento, todo tempo do tempos.json saía 0,12 s antes da fala no arquivo.
+    if (estado === 'contando') { t0 = performance.now(); rec.start(1000); }
   } else if (estado === 'gravando') {
     const t = agora();
     if (t - de[atual] < 0.4) return;  // toque duplo sem querer
     ate[atual] = t;
-    if (atual + 1 === falas.length) return encerrar();
+    if (atual + 1 === falas.length) { marcar(); return encerrar(); }
     atual++;
     de[atual] = t;
     mostrar();
+    marcar();
   }
 }
 
@@ -167,6 +194,7 @@ function regravar() {
   if (estado !== 'gravando') return;
   de[atual] = agora();
   regravadas.add(falas[atual].linha);
+  marcar();
   document.body.classList.add('regravou');
   clearTimeout(regravar.t);
   regravar.t = setTimeout(() => document.body.classList.remove('regravou'), 900);
@@ -182,6 +210,7 @@ function parar() {
     const t = agora();
     if (t - de[atual] < 1 && atual > 0) atual--;  // tinha acabado de passar: essa linha nem começou
     else ate[atual] = t;
+    marcar();
     encerrar();
   }
 }
@@ -195,14 +224,24 @@ function encerrar() {
 
 async function salvar() {
   desligar();
-  const tempos = falas.slice(0, atual + 1).map((f, i) => ({linha: f.linha, de: de[i], ate: ate[i]}));
+  let parou = '';
+  if (estado === 'contando' || estado === 'gravando') {  // o navegador parou a gravação sozinho
+    parou = motivoParada || 'a câmera ou o microfone parou de mandar imagem e som';
+    if (estado === 'contando') atual = -1;  // nenhuma linha começou
+    else if (agora() - de[atual] < 1 && atual > 0) atual--;  // tinha acabado de passar: essa linha nem começou
+    else ate[atual] = agora();
+    estado = 'salvando';
+    document.body.className = 'fim';
+    aviso('A gravação parou sozinha (' + parou + '). Salvando o que foi gravado…');
+  }
+  const tempos = lista();
   try {
     await fila;
     if (falhou) return;
-    await postar('/fim', JSON.stringify({tempos, regravadas: [...regravadas]}));
+    await postar('/fim', JSON.stringify({tempos, regravadas: [...regravadas], parou}));
     fim(`Salvo: ${tempos.length} de ${falas.length} linhas. Pode fechar esta janela.`);
     setTimeout(() => window.close(), 1500);
-  } catch (e) { erro('Não consegui salvar: ' + e.message, false); }
+  } catch (e) { erro((parou ? '' : 'Não consegui salvar: ') + e.message, false); }
 }
 
 addEventListener('keydown', e => {

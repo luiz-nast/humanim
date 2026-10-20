@@ -3,9 +3,8 @@ import re
 import shutil
 from pathlib import Path
 
-from .comum import Erro, ok, pasta_do_video, relativo, rodar
+from .comum import Erro, contar_quadros, ok, pasta_do_video, relativo, rodar
 from .formato import FPS
-from .montar import contar_quadros
 from .roteiro import ler_roteiro, ler_tempos, quadros
 
 TAMANHO = "540:960"
@@ -35,8 +34,12 @@ def prints_da_cena(video, numero):
     destinos = [pasta / f"cena_{numero:02d}_{nome}.png" for nome in ("primeiro", "meio", "ultimo")]
     extrair(video, indices, destinos)
     lista = "\n".join(f"{d.name}  {i / FPS:.2f}s" for d, i in zip(destinos, indices))
+    try:
+        anterior = {n.numero: n for n in ler_roteiro(video.parent.parent)}.get(numero - 1)
+    except Erro:
+        anterior = None
     emenda = (f"\nSe a cena continua a da linha {numero - 1}, o primeiro quadro tem que ser igual a "
-              f"cena_{numero - 1:02d}_ultimo.png.") if numero > 1 else ""
+              f"cena_{numero - 1:02d}_ultimo.png.") if anterior and anterior.tem_animacao else ""
     ok(f"3 prints de cenas/{video.name} ({n} quadros, {n / FPS:.2f}s) em {relativo(pasta)}/ (540x960):\n{lista}{emenda}")
 
 
@@ -67,6 +70,8 @@ def prints_por_linha(video):
 
 def main(args):
     video = Path(args.video).resolve() if args.video else pasta_do_video() / "saida.mp4"
+    if video.is_dir():  # a pasta do vídeo, como montar e prévia aceitam: o saida.mp4 dela
+        video = pasta_do_video(video) / "saida.mp4"
     cena = re.fullmatch(r"linha_(\d+)\.mp4", video.name)
     if not video.exists() and cena:
         raise Erro(f"{relativo(video)} não existe. Renderize a cena antes: "

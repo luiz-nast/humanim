@@ -48,17 +48,25 @@ A tela tem 8 unidades de largura por 14,22 de altura, origem no centro (x de -4 
 - Cores, cada uma com um papel: `AZUL` estrutura, `AMARELO` o que a fala aponta agora, `VERDE` sim/bom, `VERMELHO` não/ruim, `CINZA` secundário, `APAGADO` fora de foco, `BRANCO` texto. Extras: `LARANJA`, `ROXO`. Fundo preto, sempre.
 - Fonte Lato em todo `Text`. Tamanhos (`font_size`): `TITULO` 72, `ROTULO` 48, `PEQUENO` 36. Menor que `PEQUENO` não se lê no celular.
 - Traços: `stroke_width=ESPESSURA` em linhas, setas e contornos.
-- `rotulo("texto", cor=..., tamanho=...)`: o jeito de pôr texto na tela. Mais de 3 palavras dá erro de propósito.
-- Números (`Integer`, `DecimalNumber`, números de eixo) já saem em Lato e no formato brasileiro (`1.234,5`).
+- `rotulo("texto", cor=..., tamanho=...)`: o jeito de pôr texto na tela. Mais de 3 palavras dá erro de propósito (um número conta como uma).
+- `conta("0", " − ", "10", " × ", "(−55,2)", " = ", "552")`: conta ou fórmula num `Text` só (mesma linha de base), com cada parte animável (`[2]` é o "10"). É assim que se monta termo a termo; a regra das 3 palavras não vale aqui. `cores={2: AMARELO}` pinta uma parte.
+- Números (`Integer`, `DecimalNumber`, eixos) já saem em Lato, no formato brasileiro e com o menos certo: `−1.234,5`. Número escrito à mão: `br(1295.2)` dá "1.295" e `br(-55.18, 1)` dá "−55,2", igual ao `DecimalNumber`.
+- `lupa(ponto, centro)`: círculo no detalhe, ligado a uma lente maior (fundo preto) onde a cena desenha o detalhe ampliado.
 
 ## Regras visuais
 
 1. **Ritmo de Reels, não de slide.** Algo muda a cada segundo, mais ou menos. A imagem acompanha a fala: quando a fala diz "aprovado", é ali que "aprovado" acende (`self.ate("aprovado")`).
 2. **Texto só como rótulo**, até 3 palavras, num nó, eixo, seta ou destaque. Nunca frase, lista de tópicos ou título de slide: a frase está na fala.
 3. **Tudo na zona segura:** x entre -3,5 e 3,5 e y entre -4,7 e 5,6 (`AREA`). Acima e abaixo disso o app cobre com a interface, a legenda e os botões.
-4. **Em [CANTO], o canto é seu:** você fica encostado no canto inferior esquerdo da tela, cortado no peito, tocando a borda de baixo e a esquerda: o retângulo x de -4 a -0,44 e y de -7,11 a -2,37 (480 x 640 px). Nada entra nele, em nenhum quadro, nem no primeiro. Desenhe em `self.area`, que nessas linhas é y acima de -2,07. A faixa à direita do canto (x de -0,2 a 3,5, y de -4,7 a -2,4) está livre para um elemento pequeno, se fizer falta.
+4. **Em [CANTO], o canto é seu:** você fica encostado no canto inferior esquerdo, cortado no peito: x de -4 a -0,44 e y de -7,11 a -2,37 (480 x 640 px). Nada entra nele, em nenhum quadro, nem no primeiro. Desenhe em `self.area` (y acima de -2,07). Na faixa à direita do canto (x de -0,2 a 3,5, y de -4,7 a -2,4) cabe um elemento pequeno.
 5. **Cena de [CANTO] é mais simples**: um elemento principal, menos movimento.
-6. **Grande e legível:** o assunto ocupa boa parte da área; nada encostado na borda.
+6. **Grande e legível:** o assunto ocupa boa parte da área; nada encostado na borda. No eixo, números só nos valores que a fala usa ou em 2 ou 3 de referência (`numbers_to_include=[...]`), marcas sem número no resto, nunca números em duas alturas.
+7. **O desenho não engana.**
+   - Ampliar só com `lupa()` ou com uma moldura que sai do pedaço ampliado e cresce até o gráfico novo (outro `Axes`, com o intervalo novo). Não há câmera para dar zoom, e escalar o gráfico por cima dos números do eixo mente a escala.
+   - Se a fala diz que algo não é zero, o desenho mostra a distância até o zero.
+   - Número muda de valor no pouso, sem rolar por valores que não existiram; contador só rola quando conta coisas (vendas, passos).
+   - O número ao lado de uma curva é o da grandeza dessa curva. Comparação que a fala pede tem de se ver: se o dado dá 3° de diferença, ponha os dois números lado a lado.
+   - Posição pedida na descrição é indicação: mude para caber, sem mudar o sentido.
 
 ## Duração
 
@@ -66,11 +74,11 @@ A tela tem 8 unidades de largura por 14,22 de altura, origem no centro (x de -4 
 - Não escreva segundos fixos que só fecham com a duração estimada: depois da gravação as durações mudam e a cena é renderizada de novo. Dose com frações (`run_time=0.2 * self.duracao`) e sincronize com `self.ate("palavra")`.
 - Perto do fim, limite a animação ao que sobra: `run_time=min(0.5, self.restante())`. Uma animação que começa na última palavra e dura mais que o resto estoura a fala.
 - Rede de segurança (fala gravada mais rápida que a estimada): todo `self.play(..., run_time=...)` é encurtado para caber no que resta e, sem tempo nenhum, pula direto para o estado final. Não vale para `self.wait(...)` nem para `play` sem `run_time`: escreva sempre o `run_time`.
-- Animação mais longa que a fala é ERRO do `animar`. E o `animar` avisa (`ATENÇÃO imagem parada de Xs a Ys`) todo trecho de 1,5 s ou mais em que nada muda, inclusive o fim que o `self.completar()` preenche: ali, adiante a próxima animação ou destaque a palavra que a fala diz.
+- Animação mais longa que a fala é ERRO do `animar`, e 1,5 s ou mais sem nada mudar (inclusive o fim que o `completar()` preenche) vira `ATENÇÃO imagem parada`: adiante a próxima animação ou destaque a palavra que a fala diz ali.
 
 ## Continuidade (`cenas/comum.py`)
 
-- Quando a linha N+1 continua a linha N, a cena N+1 começa redesenhando o estado final da N, sem animação (`self.add(...)`), para o corte não aparecer. Os dois estados saem de funções do `comum.py`, com posições fixas (números no `comum.py`, nunca dependentes de tempo).
+- Quando a linha N+1 continua a linha N, a cena N+1 começa redesenhando o estado final da N, sem animação (`self.add(...)`), para o corte não aparecer. Os dois estados saem de funções do `comum.py`, com posições fixas (números no `comum.py`, nunca dependentes de tempo). O que mudou com animação (um `DecimalNumber` depois de `set_value` fica 1 a 2 px fora) termina com `.become(...)` do mesmo objeto criado pelo `comum.py`.
 - [ANIM] seguida de [CANTO] que continua a cena: a [ANIM] já desenha dentro da área do CANTO (`AREA_CANTO`), senão você aparece por cima no corte. De [CANTO] para [ANIM], a cena pode crescer para a tela toda logo no começo.
 - Depois de uma linha [CARA], a cena pode começar do zero.
 - Pontos ou posições aleatórias: `rng = np.random.default_rng(7)` no `comum.py`, para todo render e toda linha verem os mesmos pontos.
@@ -79,14 +87,12 @@ A tela tem 8 unidades de largura por 14,22 de altura, origem no centro (x de -4 
 
 Rode da raiz do repositório, como no `CLAUDE.md`:
 
-1. `humanim animar videos/<slug>/roteiro.md --linha N` (pode repetir `--linha`). Sai `OK linha N: ...` ou `ERRO linha N: ...` dizendo o que fazer.
-2. `humanim frames videos/<slug>/cenas/linha_NN.mp4`: 3 prints em `videos/<slug>/frames/`: `cena_NN_primeiro`, `cena_NN_meio` e `cena_NN_ultimo` (o primeiro e o último quadro de verdade).
-3. Olhe cada print com Read. Confira: lê-se tudo? algo cortado na borda ou sobreposto? em [CANTO], o canto inferior esquerdo está vazio, também no `_primeiro`? a imagem bate com a fala naquele momento?
+1. `humanim animar videos/<slug>/roteiro.md --linha N` (pode repetir `--linha`; para iterar, só as linhas que mudaram). Sai `OK linha N: ...` ou `ERRO linha N: ...` dizendo o que fazer.
+2. `humanim frames videos/<slug>/cenas/linha_NN.mp4`: 3 prints em `videos/<slug>/frames/`: `cena_NN_primeiro`, `cena_NN_meio` e `cena_NN_ultimo` (o primeiro e o último quadro de verdade). Cena com vários eventos pede a folha, um quadro a cada 0,5 s com o tempo escrito: `ffmpeg -v error -y -i videos/<slug>/cenas/linha_NN.mp4 -vf "fps=2,scale=270:480,drawtext=text='%{pts\:hms}':x=6:y=6:fontsize=20:fontcolor=yellow,tile=6x3" -frames:v 1 videos/<slug>/frames/folha_NN.png`.
+3. Olhe cada imagem com Read. Confira: lê-se tudo? algo cortado na borda, sobreposto ou entrando de fora da zona segura? tela vazia em algum momento? em [CANTO], o canto inferior esquerdo está vazio, também no `_primeiro`? a imagem bate com a fala naquele momento? o desenho engana (regra 7)?
 4. Linhas que continuam a cena: o `cena_N_ultimo` e o `cena_(N+1)_primeiro` têm que ser a mesma imagem, senão o corte salta.
 5. Ajuste e repita até ficar bom. Para ver as zonas, rode `HUMANIM_DEPURAR=1 humanim animar videos/<slug>/roteiro.md --linha N`: desenha a zona segura (cinza) e, em [CANTO], o seu canto (vermelho tracejado). Antes de montar, rode de novo sem a variável.
-6. No fim, `humanim animar videos/<slug>/roteiro.md` sem `--linha`: renderiza todas (até 3 ao mesmo tempo) e pula as que não mudaram (`cenas/render.json`). Mudar o `comum.py` ou o estilo renderiza de novo as linhas que dependem deles.
-
-Depois da gravação e do `humanim editar` (`tempos.json` e `edicao.json` novos), rode `humanim animar videos/<slug>/roteiro.md` de novo: as durações da fala editada (sem pausas, muletas e repetições) entram sozinhas. Elas costumam sair mais curtas que as gravadas: por isso as frações e o `self.ate("palavra")`, nunca segundos fixos.
+6. No fim, `humanim animar videos/<slug>/roteiro.md` sem `--linha`: renderiza todas (quantas por vez a memória livre deixa, de 1 a 3; `HUMANIM_PARALELO=1` força uma) e pula as que não mudaram (`cenas/render.json`). O vídeo inteiro leva uns 2 a 3 min: rode em segundo plano ou com timeout maior que os 2 min do Bash, e nada pesado junto. Mudar o `comum.py`, o estilo, o `humanim/formato.py` ou o ritmo da fala (`humanim/fala.py`) renderiza de novo as linhas que dependem deles; a prévia lista em "Falta animar" a linha cujo clipe ficou velho. Depois da gravação e do `editar`, rode de novo: as durações da fala editada entram sozinhas.
 
 ## Armadilhas
 
@@ -94,17 +100,18 @@ Depois da gravação e do `humanim editar` (`tempos.json` e `edicao.json` novos)
 
 | Quebra | Use |
 | --- | --- |
-| `MathTex`, `Tex`, `SingleStringMathTex` | `Text` (`"x²"` com caractere Unicode) |
+| `MathTex`, `Tex`, `SingleStringMathTex` | `conta(...)` ou `rotulo(...)`, com caractere Unicode (`"x²"`) |
 | `Title`, `BulletedList` | `rotulo(...)`; lista de tópicos nunca |
 | `Matrix`, `IntegerMatrix`, `DecimalMatrix`, `MathTable` | `Table` ou `IntegerTable`, ou quadrados com `Text` num `VGroup(...).arrange_in_grid()` |
-| `Variable` | `rotulo("nome")` ao lado de um `DecimalNumber` com updater |
 | `Brace(...).get_text/get_tex`, `BraceLabel` padrão | `BraceText(obj, "texto")` ou `BraceLabel(obj, "texto", label_constructor=Text)` |
 | `LabeledDot("a")`, `LabeledLine("a", ...)` | `LabeledDot(Text("a", color=FUNDO))` (o ponto é branco: texto branco some); `Line` + `rotulo` ao lado |
 | `Graph(..., labels=True)` | `labels={v: Text(str(v), color=FUNDO, font_size=PEQUENO)}`; para vértices coloridos, `vertex_config={"fill_color": AZUL}` |
 | `BarChart(..., bar_names=[...])` | `BarChart` sem nomes + `rotulo` embaixo de cada barra (`chart.bars[i]`) |
 | `DecimalNumber(..., unit="%")` ou `show_ellipsis=True` | `rotulo("%")` com `.next_to(numero, RIGHT)` |
 
-Funcionam (o estilo troca o LaTeX por Text): `Integer`, `DecimalNumber`, `ChangeDecimalToValue`, `NumberLine` e `Axes` com `include_numbers`, `add_coordinates`, `get_axis_labels`, `BarChart` sem nomes (já sai nas cores do estilo), `Table`, `IntegerTable`, `DecimalTable`, `BraceText`, `LabeledArrow(Text(...))`, `Code`, `MarkupText`.
+Funcionam (o estilo troca o LaTeX por Text): `Integer`, `DecimalNumber`, `NumberLine` e `Axes` com números, `BarChart` sem nomes, `Table`, `IntegerTable`, `DecimalTable`, `BraceText`, `LabeledArrow(Text(...))`.
+
+Símbolos que a Lato tem: × − ÷ ± ≈ ≠ ≤ ≥ → √ ∑ ∫ ∂ ∞ Δ θ λ ε η α σ μ π ½ ² ³, os dígitos sobrescritos e subscritos (w₀, 10⁻⁴), ŷ e x̄. Não tem ∇, ∈, ⋅ nem a maioria das letras subscritas (ₖ ₙ ₘ ₜ ⱼ): saem em outra fonte ou como caixa. Escreva "gradiente", "w novo", "·".
 
 Outras:
 
@@ -112,8 +119,12 @@ Outras:
 - `Transform` numa parte e `.animate` no grupo que a contém, no mesmo `play`, brigam. Anime as partes, cada uma para o seu alvo.
 - `Indicate`, `Flash`, `Wiggle`, `Circumscribe` voltam ao estado de antes: bons para destacar sem mudar o estado final.
 - `self.wait()` sem número espera 1 s.
-- Largura: a área útil tem 7 unidades. Em `ROTULO`, cada letra ocupa uns 0,27; em `PEQUENO`, uns 0,2. `Axes` com `x_length` até 6,5.
-- Sem `self.camera.frame` (a cena não é `MovingCamera`): para "aproximar", escale e mova os objetos.
+- `numero.animate.set_value(v)` quebra (`zip() argument 2 is longer than argument 1`) quando o número muda de tamanho ("−55,2" para "12,5"). Troque com `numero.set_value(v)` no pouso; `ChangeDecimalToValue(numero, v)` rola pelos valores do meio, então só para contador (regra 7).
+- Medidas: a área útil tem 7 de largura e `Axes` vai até `x_length` 6,5. Meça antes de posicionar (`Text("1.000", font_size=PEQUENO).width` dá 1,22). De cabeça, letra, dígito e altura de "Ég": `PEQUENO` 0,22, 0,29 e 0,55; `ROTULO` 0,3, 0,38 e 0,74; `TITULO` 0,45, 0,57 e 1,1.
+- `Axes` cruza os eixos no zero: com x de −1.000 a 3.600, o eixo y fica no meio do gráfico. Para ele ficar à esquerda, desloque os dados para x começar no 0 e escreva os números com `br()`.
+- `FadeOut` de tudo e depois `Create`/`FadeIn` do novo deixa a tela preta no meio: ponha os dois no mesmo `play`. E `FadeIn(..., shift=...)` começa deslocado: perto da borda, entra de fora da zona segura.
+- Seta curva com `Create` desenha a ponta por último, só o contorno. Separe: `ponta = arco.add_tip().pop_tips()[0]`, `Create(arco)` e, no fim, `FadeIn(ponta)`.
+- Gatilho num número: a fala "1.295" são as palavras "1" e "295", e `self.ate("295")` espera o fim do número falado.
 
 ## Exemplo
 
@@ -150,8 +161,8 @@ class Cena(CenaHumanim):
 - [ ] Uma cena por linha [ANIM] e [CANTO], `class Cena(CenaHumanim)`, terminando em `self.completar()`
 - [ ] `humanim animar roteiro.md` deu OK em todas, sem `HUMANIM_DEPURAR`
 - [ ] Olhou os prints de cada cena
-- [ ] Só rótulos de até 3 palavras; nenhuma frase na tela
-- [ ] Nada fora da zona segura; canto livre nas linhas [CANTO]
+- [ ] Só rótulos de até 3 palavras e contas montadas com `conta()`; nenhuma frase na tela
+- [ ] Nada fora da zona segura; canto livre nas linhas [CANTO]; o desenho não engana
 - [ ] Linhas que continuam a cena emendam (o fim de uma é o começo da outra)
 
 No chat: uma linha por cena dizendo o que ela mostra, e o que vale quem apresenta conferir (uma escolha visual duvidosa, uma simplificação).

@@ -1,19 +1,26 @@
-"""humanim previa: o animatic. Animação à esquerda, roteiro passando à direita, antes de gravar."""
+"""humanim previa: o animatic. Animação à esquerda, roteiro passando à direita, antes de gravar.
+
+O vídeo sai linha a linha (um ffmpeg por linha, em meio tamanho) e depois as linhas são emendadas sem
+recodificar: a memória é a de uma linha só, não cresce com o número de linhas animadas.
+"""
 import json
 import os
-import shlex
 import shutil
 import subprocess
 import textwrap
 from pathlib import Path
 
-from .comum import Erro, ok, pasta_do_video, rodar, trabalho
+from .animar import ler_feitas, motivo_da_cena, por_motivo
+from .comum import Erro, comandos, contar_quadros, ok, pasta_do_video, relativo, rodar, trabalho
 from .formato import CANTO, FPS, LARGURA, lados_soltos
 from .roteiro import EDICAO, ler_roteiro, ler_tempos, quadros
 
 L, A = 540, 960  # meio tamanho: sai rápido e basta para ver
 K = L / LARGURA
 MODELO = Path(__file__).with_name("previa.html")
+# Iguais em toda linha, para as linhas emendarem sem recodificar (concat com -c copy).
+X264 = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-r", str(FPS),
+        "-g", str(FPS)]
 
 
 def esc(valor):
@@ -26,26 +33,17 @@ def esc(valor):
     return v
 
 
-def contar_quadros(clipe):
+def conferir(pasta, linha, n, feitas):
+    """(usa o clipe?, motivo do aviso ou '') de uma linha ANIM/CANTO. A pergunta é a do montar
+    (animar.motivo_da_cena); o clipe que não é da cena atual mas tem os quadros da fala entra, com aviso."""
     try:
-        saida = rodar(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_packets",
-                       "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", clipe], "ffprobe")
-        return int(saida.strip().split(",")[0])
-    except (Erro, ValueError):
-        return -1
-
-
-def conferir(pasta, linha, n):
-    """(usa o clipe?, motivo do aviso ou '') de uma linha ANIM/CANTO."""
-    py, mp4 = pasta / "cenas" / f"{linha.cena}.py", pasta / "cenas" / f"{linha.cena}.mp4"
-    if not mp4.exists():
-        return False, f"falta renderizar cenas/{linha.cena}.py" if py.exists() else f"falta escrever cenas/{linha.cena}.py"
-    q = contar_quadros(mp4)
-    if q != n:
-        return False, f"cenas/{linha.cena}.mp4 tem {q} quadros, a fala pede {n} ({n / FPS:.2f} s)"
-    if py.exists() and py.stat().st_mtime > mp4.stat().st_mtime:
-        return True, f"cenas/{linha.cena}.py mudou depois do .mp4 (a prévia mostra o clipe antigo)"
-    return True, ""
+        motivo = motivo_da_cena(pasta, linha, n, feitas)
+        if not motivo:
+            return True, ""
+        clipe = pasta / "cenas" / f"{linha.cena}.mp4"
+        return clipe.exists() and abs(contar_quadros(clipe) - n) <= 1, motivo
+    except Erro as e:  # clipe sem vídeo ou quebrado
+        return False, str(e)
 
 
 def main(args):
@@ -53,6 +51,7 @@ def main(args):
     linhas = ler_roteiro(pasta)
     tempos, estimado = ler_tempos(pasta, linhas)
     contagens = quadros(tempos)
+    feitas = ler_feitas(pasta)
     t = trabalho(pasta)
     textos = t / "previa"
     shutil.rmtree(textos, ignore_errors=True)
@@ -70,11 +69,11 @@ def main(args):
                                f"fontsize={tamanho}:fontcolor={cor}:x={x}:y={y}+{i * round(tamanho * 1.4)}")
         return ",".join(filtros)
 
-    entradas, partes, rotulos, avisos, dados, inicio = [], [], [], [], [], 0
+    segmentos, avisos, dados, inicio = [], [], [], 0
     for linha, n in zip(linhas, contagens):
         motivo, usa = "", False
         if linha.tem_animacao:
-            usa, motivo = conferir(pasta, linha, n)
+            usa, motivo = conferir(pasta, linha, n, feitas)
             if motivo:
                 avisos.append((linha.numero, motivo))
         dados.append({"n": linha.numero, "marca": linha.marca, "descricao": linha.descricao, "fala": linha.fala,
@@ -83,10 +82,11 @@ def main(args):
         inicio += n
         if n <= 0:
             continue
-        cena = linha.cena
+        cena, entrada = linha.cena, []
         if usa:
-            entradas += ["-i", pasta / "cenas" / f"{cena}.mp4"]
-            f = f"[{len(entradas) // 2 - 1}:v]trim=end_frame={n},setpts=PTS-STARTPTS,scale={L}:{A},setsar=1"
+            entrada = ["-i", pasta / "cenas" / f"{cena}.mp4"]
+            f = (f"[0:v]tpad=stop_mode=clone:stop=1,trim=end_frame={n},setpts=PTS-STARTPTS,"
+                 f"scale={L}:{A},setsar=1")
             if linha.marca == "CANTO":
                 # você no mesmo lugar do montar, encostado na tela: contorno só nos lados soltos
                 x, y, w, h = (round(c * K) for c in CANTO)
@@ -104,36 +104,44 @@ def main(args):
         else:
             f = (f"color=c=black:s={L}x{A}:r={FPS},trim=end_frame={n},"
                  + escrever(cena, 110, "0x5a5a5a", "(h-text_h)/2", "VOCÊ"))
-        partes.append(f"{f},format=yuv420p[v{len(rotulos)}]")
-        rotulos.append(f"[v{len(rotulos)}]")
-    if not rotulos:
+        destino = textos / f"seg_{linha.numero:02d}.mp4"
+        rodar(["ffmpeg", "-nostdin", "-y", "-v", "error", *entrada, "-filter_complex", f"{f},format=yuv420p[v]",
+               "-map", "[v]", "-frames:v", n, *X264, "-an", destino], f"ffmpeg na prévia da linha {linha.numero}")
+        segmentos.append(destino)
+    if not segmentos:
         raise Erro("todas as linhas têm 0 quadros: confira o tempos.json.")
 
-    grafo = ";".join(partes) + f";{''.join(rotulos)}concat=n={len(rotulos)}:v=1:a=0[saida]"
+    lista = textos / "linhas.txt"
+    lista.write_text("".join(f"file '{s.name}'\n" for s in segmentos), encoding="utf-8")
     video = t / "previa.mp4"
-    rodar(["ffmpeg", "-nostdin", "-y", "-v", "error", *entradas, "-filter_complex", grafo, "-map", "[saida]",
-           "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p", "-g", str(FPS),
-           "-movflags", "+faststart", video], "ffmpeg montando a prévia")
+    rodar(["ffmpeg", "-nostdin", "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", lista, "-c", "copy",
+           "-movflags", "+faststart", video], "ffmpeg emendando as linhas da prévia")
 
     total = inicio / FPS
     pagina = {"titulo": pasta.name, "estimado": estimado, "duracao": round(total, 3),
               "video": f".trabalho/previa.mp4?v={video.stat().st_mtime_ns}", "linhas": dados}
     html = pasta / "previa.html"
+    primeira = not html.exists()
     embutido = json.dumps(pagina, ensure_ascii=False).replace("</", "<\\/")
     html.write_text(MODELO.read_text(encoding="utf-8").replace("__DADOS__", embutido), encoding="utf-8")
 
-    aberto = not args.nao_abrir and abrir(html)
+    # Abre só na primeira vez: depois a aba já está no navegador, e abrir de novo empilha abas iguais.
+    if args.nao_abrir:
+        onde = ""
+    elif primeira:
+        onde = " · aberta no navegador" if abrir(html) else f" · abra no navegador: {html.as_uri()}"
+    else:
+        onde = f" · recarregue a aba da prévia (F5); se ela foi fechada, abra: {html.as_uri()}"
     origem = ("estimados (pelo tamanho das falas)" if estimado else
               "da fala editada (edicao.json)" if (pasta / EDICAO).exists() else "reais (tempos.json)")
-    ok(f"prévia em {os.path.relpath(html)} · {len(linhas)} linhas · {total:.1f} s · tempos {origem}"
-       + (" · aberta no navegador" if aberto else "" if args.nao_abrir else f" · abra no navegador: {html.as_uri()}"))
+    ok(f"prévia em {os.path.relpath(html)} · {len(linhas)} linhas · {total:.1f} s · tempos {origem}{onde}")
     if avisos:
-        print(f"Falta animar {len(avisos)} linha(s):")
-        for numero, motivo in avisos:
-            print(f"  linha {numero}: {motivo}")
+        print(f"Falta animar {len(avisos)} linha(s) (a prévia mostra o clipe que existe, se tem a duração certa; "
+              f"o montar recusa):")
+        print(por_motivo(avisos))
         so = " ".join(f"--linha {numero}" for numero, _ in avisos)
-        antes = "Escreva as cenas que faltam e rode" if any("escrever" in m for _, m in avisos) else "Rode"
-        print(f"{antes}: humanim animar {shlex.quote(os.path.relpath(pasta / 'roteiro.md'))} {so}")
+        antes = "Escreva as cenas que faltam e rode" if any("skill cenas" in m for _, m in avisos) else "Rode"
+        print(comandos(f"{antes}: humanim animar {relativo(pasta / 'roteiro.md')} {so}"), flush=True)
 
 
 def abrir(html):

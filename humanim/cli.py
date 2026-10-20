@@ -1,9 +1,10 @@
 """O comando humanim. Cada subcomando vive no seu módulo, com uma função main(args)."""
 import argparse
+import errno
 import importlib
 import sys
 
-from .comum import RAIZ, Erro, ok
+from .comum import RAIZ, Erro, comandos, ok
 
 
 def novo(args):
@@ -11,7 +12,9 @@ def novo(args):
     if pasta.exists():
         raise Erro(f"videos/{args.slug}/ já existe. Escolha outro nome ou trabalhe nela.")
     (pasta / "cenas").mkdir(parents=True)
-    ok(f"videos/{args.slug}/ criada. Próximo: escrever roteiro.md (skill roteiro).")
+    (pasta / "dados").mkdir()
+    ok(f"videos/{args.slug}/ criada. Próximo: a pesquisa (teoria.md, fontes.md e dados/, skill diretor), "
+       f"depois roteiro.md (skill roteiro).")
 
 
 def main():
@@ -20,6 +23,9 @@ def main():
 
     s = sub.add_parser("novo", help="cria a pasta do vídeo")
     s.add_argument("slug")
+
+    s = sub.add_parser("contar", help="duração de cada linha do roteiro e o segundo de cada gatilho")
+    s.add_argument("roteiro", nargs="?")
 
     s = sub.add_parser("animar", help="renderiza as cenas na duração de cada fala")
     s.add_argument("roteiro", nargs="?")
@@ -53,7 +59,12 @@ def main():
         else:
             importlib.import_module(f"humanim.{args.comando}").main(args)
     except Erro as e:
-        print(f"ERRO {e}", flush=True)
+        print(f"ERRO {comandos(str(e))}", flush=True)
+        sys.exit(1)
+    except OSError as e:  # disco cheio, sem permissão, arquivo sumiu: também vira ERRO, não traceback
+        causa = ("O disco está cheio: libere espaço (df -h .) e rode de novo." if e.errno == errno.ENOSPC else
+                 "Confira o espaço em disco (df -h .) e as permissões, e rode de novo.")
+        print(f"ERRO falha de arquivo: {e}. {causa}", flush=True)
         sys.exit(1)
     except KeyboardInterrupt:
         print("ERRO interrompido.", flush=True)

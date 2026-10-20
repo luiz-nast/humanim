@@ -23,7 +23,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .comum import RAIZ, Erro, ok, pasta_do_video, relativo, trabalho
+from .comum import AUDIO_DO_ZERO, RAIZ, Erro, memoria_livre, ok, pasta_do_video, relativo, trabalho
+from .fala import PAUSA, numero, pontuacao
 from .formato import FPS
 from .roteiro import EDICAO, assinatura_edicao, ler_roteiro, ler_tempos
 
@@ -35,8 +36,11 @@ from .roteiro import EDICAO, assinatura_edicao, ler_roteiro, ler_tempos
 # que o small às vezes engole (e aí ela não sai). Com pouca memória livre cai para o small, que cabe
 # do lado de outra coisa pesada. HUMANIM_WHISPER escolhe (nome do modelo ou pasta de um modelo CTranslate2).
 PADRAO, LEVE, MEMORIA_PADRAO = "large-v3-turbo", "small", 3.0  # GB livres para o padrão (pico de 2,6 GB)
+MEMORIA_MINIMA = 1.5  # GB livres para abrir qualquer modelo (o small chega a 1 GB): abaixo disso, ERRO e não trava
 MODELO = os.environ.get("HUMANIM_WHISPER", "")
 THREADS = int(os.environ.get("HUMANIM_WHISPER_THREADS", 4))
+FANTASMA = 0.2  # palavra com certeza abaixo disto e sem voz embaixo é invenção da transcrição
+BURACO, VOLTAS = 0.5, 4  # fala sem palavra a partir disto (s de voz) é transcrita de novo, até VOLTAS vezes
 MODELOS = RAIZ / "modelos" / "whisper"
 TAMANHO = {"tiny": "75 MB", "base": "145 MB", "small": "460 MB", "medium": "1,5 GB", "large-v3-turbo": "1,6 GB"}
 # Puxa a transcrição literal: sem isto o Whisper "limpa" muleta e repetição, e aí não dá para cortar.
@@ -44,12 +48,24 @@ PROMPT = "Hã, é... então, hum, eu, eu acho que... Bom, é isso. Tá, vamos l�
 
 SR = 16000
 PASSO = 0.01  # energia de 10 em 10 ms
-PAUSA = {"frase": 0.30, "virgula": 0.20, "palavra": 0.12}  # pausa que fica, pela pontuação do roteiro
+# PAUSA (fala.py): a pausa que fica depois de cada palavra, pela pontuação do roteiro
 FOLGA = 0.10  # pausa até PAUSA + FOLGA fica como está: cortar pouco só faz pulo
 INICIO, FIM = 0.06, 0.16  # respiro antes da primeira e depois da última palavra de cada linha
 MARGEM = 0.3  # quanto um trecho pode passar do [de, ate] do tempos.json (Espaço apertado em cima da fala)
 FRONTEIRA = 0.5  # palavra a até isto da tecla (Espaço antes do fim da fala, R depois de recomeçar) pode ser da vizinha
 OCLUSIVA = 0.15  # quase silêncio mais curto que isto dentro da palavra é o p/t/k ("gru-p-os"), não pausa
+TAPA_OCLUSIVA, TAPA_ESTALO = 0.04, 0.03  # buraco de som tapado no meio da fala; som solto que não conta (estalo)
+SILENCIO_ANTES = 0.20  # silêncio a partir disto no começo de uma palavra: ela começa depois dele (onset)
+SILENCIO_DEPOIS, FALA_ANTES = 0.25, 0.05  # silêncio que encerra a palavra (offset), com pelo menos FALA_ANTES de som
+VAO_ESTENDER = 0.15  # estender o começo ou o fim sobre o som para num silêncio maior que isto
+POR_FALTA = 0.45  # segundos de som que cada palavra do roteiro que faltou pode ter na ponta da fala
+CONTINUA = 1.0  # até quanto depois do fim que a transcrição dá a palavra pode seguir, se o som não para
+VOZ = 0.12  # cruzamento por zero abaixo disto é voz (vogal, m, n); acima, ruído (respiração, s, f, x)
+SIBILO = 0.36  # e acima disto, o chiado do s, x, ch, f (fala); a respiração é um ruído mais grave
+# Respiração: som sem voz e sem chiado entre dois vales, de pelo menos RESPIRO. Mais curta que RESPIRO_LONGA,
+# também QUIETA dB abaixo da voz: a sílaba final sem voz ("limi-te", "clien-te" com o e mudo) é forte como a fala.
+RESPIRO, RESPIRO_LONGA, QUIETA = 0.10, 0.30, 10.0
+REPETIDA = 0.5  # casar a primeira cópia de uma repetição ("Vai prever. Vai prever calote") custa isto a mais
 ILHA = 2.0  # voltar a casar depois de 2+ palavras fora do roteiro no meio: emenda de duas tentativas, evitar
 CORTE_MINIMO = 0.1  # corte menor que isto não compensa o pulo
 PARECIDO = 0.75  # palavras com essa semelhança contam como a mesma (pra/para, Taiwan/taiuan)
@@ -66,47 +82,11 @@ NOMES = {"silencio": ("silêncio", "silêncios"), "respiracao": ("respiração",
 
 # ---------------------------------------------------------------- palavras e números
 
-UNIDADES = ("zero um dois três quatro cinco seis sete oito nove dez onze doze treze quatorze quinze dezesseis "
-            "dezessete dezoito dezenove").split()
-DEZENAS = "_ _ vinte trinta quarenta cinquenta sessenta setenta oitenta noventa".split()
-CENTENAS = "_ cento duzentos trezentos quatrocentos quinhentos seiscentos setecentos oitocentos novecentos".split()
-TOKEN = re.compile(r"\d+(?:[.,]\d+)*(?:\s?%)?|\w+|%")
-
-
-def extenso(n):
-    """Número inteiro por extenso, em palavras: 2005 -> dois mil e cinco."""
-    if n < 20:
-        return [UNIDADES[n]]
-    if n < 100:
-        d, u = divmod(n, 10)
-        return [DEZENAS[d]] + (["e", UNIDADES[u]] if u else [])
-    if n < 1000:
-        if n == 100:
-            return ["cem"]
-        c, r = divmod(n, 100)
-        return [CENTENAS[c]] + (["e"] + extenso(r) if r else [])
-    for base, um, varios in ((10 ** 9, "bilhão", "bilhões"), (10 ** 6, "milhão", "milhões"), (1000, "mil", "mil")):
-        if n >= base:
-            q, r = divmod(n, base)
-            if q >= 1000:
-                return list(str(n))
-            antes = ([] if q == 1 and base == 1000 else extenso(q)) + [um if q == 1 else varios]
-            return antes + (((["e"] if r < 100 or r % 100 == 0 else []) + extenso(r)) if r else [])
-    return list(str(n))
-
-
-def numero(texto):
-    """'30', '30.000', '2,5', '20%' em palavras."""
-    pct = texto.endswith("%")
-    t = texto.rstrip("%").strip()
-    if re.fullmatch(r"\d{1,3}(\.\d{3})+", t):
-        t = t.replace(".", "")
-    inteiro, _, decimal = t.replace(".", ",").partition(",")
-    palavras = extenso(int(inteiro)) if len(inteiro) < 13 else list(inteiro)
-    if decimal.isdigit():
-        palavras += ["vírgula"] + (extenso(int(decimal)) if not decimal.startswith("0") else
-                                   [UNIDADES[int(c)] for c in decimal])
-    return palavras + (["por", "cento"] if pct else [])
+# Os números por extenso (numero, extenso) moram no fala.py: são regras de como o texto é falado.
+TOKEN = re.compile(r"(?:R|US)\$\s?\d+(?:[.,]\d+)*|\d+(?:[.,]\d+)*(?:\s?%)?|\w+|%")
+MOEDAS = {"R": ("real", "reais"), "US": ("dólar", "dólares")}
+GRANDEZAS = {"mil": "", "milhao": "de", "milhoes": "de", "bilhao": "de", "bilhoes": "de", "trilhao": "de",
+             "trilhoes": "de"}  # "R$ 30 mil" = trinta mil reais; "R$ 2 bilhões" = dois bilhões de reais
 
 
 def normal(palavra):
@@ -121,13 +101,22 @@ def muleta(token):
 
 
 def tokens(texto):
-    """[(normalizado, como está no texto, pontuação depois)]: números viram palavras."""
-    saida, achados = [], list(TOKEN.finditer(texto))
+    """[(normalizado, como está no texto, pontuação depois)]: números viram palavras, e valor em dinheiro
+    também, com a moeda onde se fala ("R$ 1.500" = mil e quinhentos reais)."""
+    saida, achados, moeda = [], list(TOKEN.finditer(texto)), None
     for i, m in enumerate(achados):
         depois = texto[m.end():achados[i + 1].start() if i + 1 < len(achados) else len(texto)]
-        pont = "frase" if re.search(r"[.?!:…]", depois) else "virgula" if re.search(r"[,;—–]| - ", depois) else ""
+        pont = pontuacao(depois)
         bruto = m.group()
-        partes = numero(bruto) if bruto[0].isdigit() else ["por", "cento"] if bruto == "%" else [bruto]
+        if "$" in bruto:
+            sigla, valor = bruto.split("$")
+            partes, moeda = numero(valor.strip()), MOEDAS[sigla][valor.strip() != "1"]
+            if i + 1 == len(achados) or normal(achados[i + 1].group()) not in GRANDEZAS:
+                partes, moeda = partes + [moeda], None
+        elif moeda and normal(bruto) in GRANDEZAS:  # a moeda do valor de antes vem depois do "bilhões"
+            partes, moeda = [bruto] + [GRANDEZAS[normal(bruto)]] * bool(GRANDEZAS[normal(bruto)]) + [moeda], None
+        else:
+            partes = numero(bruto) if bruto[0].isdigit() else ["por", "cento"] if bruto == "%" else [bruto]
         for k, parte in enumerate(partes):
             saida.append((normal(parte), bruto, pont if k == len(partes) - 1 else ""))
     return saida
@@ -157,21 +146,12 @@ class Palavra:
 def carregar_audio(gravacao):
     """Áudio a 16 kHz, mono, com t=0 no início do arquivo: a mesma linha do tempo do tempos.json e do montar."""
     r = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", str(gravacao), "-map", "0:a:0",
-                        "-af", "aresample=async=1:first_pts=0", "-ar", str(SR), "-ac", "1", "-f", "f32le", "-"],
+                        "-af", AUDIO_DO_ZERO, "-ar", str(SR), "-ac", "1", "-f", "f32le", "-"],
                        capture_output=True)
     if r.returncode != 0 or not r.stdout:
         fim = r.stderr.decode(errors="replace").strip().splitlines()[-3:]
         raise Erro(f"não consegui ler o áudio de {relativo(gravacao)} (ela tem som?): {' '.join(fim)}")
     return np.frombuffer(r.stdout, np.float32)
-
-
-def memoria_livre():
-    """GB de memória disponível (MemAvailable), ou None fora do Linux."""
-    try:
-        with open("/proc/meminfo") as f:
-            return next(int(x.split()[1]) / 2 ** 20 for x in f if x.startswith("MemAvailable:"))
-    except (OSError, StopIteration, ValueError):
-        return None
 
 
 def escolher_modelo(pasta, assinatura):
@@ -188,6 +168,9 @@ def escolher_modelo(pasta, assinatura):
     return PADRAO, ""
 
 
+SEM_FASTER_WHISPER = "falta o faster-whisper no ambiente do humanim. Instale: uv pip install -p .venv/bin/python -e ."
+
+
 def caminho_modelo(nome):
     if os.path.isdir(nome):
         return nome
@@ -197,8 +180,7 @@ def caminho_modelo(nome):
     try:
         from faster_whisper.utils import available_models, download_model
     except ImportError:
-        raise Erro("falta o faster-whisper no ambiente do humanim. Instale: "
-                   "uv pip install -p .venv/bin/python -e .") from None
+        raise Erro(SEM_FASTER_WHISPER) from None
     if nome not in available_models():
         raise Erro(f"HUMANIM_WHISPER={nome} não é um modelo do faster-whisper nem uma pasta. Use um destes: "
                    f"{', '.join(available_models())} (padrão: {PADRAO}).")
@@ -227,27 +209,85 @@ def guardada(pasta, assinatura, nome):
     return None
 
 
-def transcrever(audio, pasta, assinatura, nome):
-    """Palavras com tempo, da gravação inteira. Guarda em .trabalho/ e reaproveita se nada mudou."""
+def transcrever(audio, pasta, assinatura, nome, som):
+    """Palavras com tempo, da gravação inteira. Guarda em .trabalho/ e reaproveita se nada mudou.
+
+    O Whisper às vezes dá a janela de 30 s por encerrada depois da primeira frase e pula o resto dela. Com
+    os 3 s mudos da contagem antes de um começo errado ("Pra prever… Pra prever calote"), ele escreveu só
+    "Quero viver", com o tempo de uma frase 24 s depois, e pulou o resto. Por isso a transcrição começa logo
+    antes do primeiro som, e fala com som e sem palavra (buraco) é transcrita de novo, até a primeira frase
+    depois dela (que pode ter vindo com o tempo errado), até não sobrar buraco ou não sair palavra nova."""
     cache = arquivo_transcricao(pasta, nome)
     palavras = guardada(pasta, assinatura, nome)
+    modelo, mudou, tentados = None, palavras is None, []
     if palavras is not None:
         print(f"transcrição reaproveitada ({cache.name}: mesma gravação, mesmo modelo).", flush=True)
-        return colar_numeros(palavras)
+        # buraco que já foi transcrito de novo sem sair palavra (tosse, risada) não abre o modelo outra vez
+        tentados = json.loads(cache.read_text(encoding="utf-8")).get("tentados", [])
+    else:
+        modelo = carregar_whisper(nome, pasta)
+        print(f"transcrevendo {len(audio) / SR:.0f}s de fala com o modelo {nome} na CPU ...", flush=True)
+        inicio = time.monotonic()
+        voz = np.nonzero(som.som)[0]
+        palavras = whisper(modelo, audio, pasta, [max(0.0, voz[0] * PASSO - 0.3)] if len(voz) else None)
+        print(f"  transcrito em {time.monotonic() - inicio:.0f}s", flush=True)
+    for _ in range(VOLTAS):
+        lista = [(a, b) for a, b in buracos(som, palavras) if not any(x <= a and b <= y for x, y in tentados)]
+        if not lista:
+            break
+        modelo = modelo or carregar_whisper(nome, pasta)
+        print(f"  a transcrição pulou fala com som em {', '.join(f'{a:.1f}s a {b:.1f}s' for a, b in lista)}: "
+              f"transcrevendo de novo só ali ...", flush=True)
+        novas = whisper(modelo, audio, pasta, [t for par in lista for t in par])
+        refeitos = [(a, b) for a, b in lista if any(a <= (w.de + w.ate) / 2 <= b for w in novas)]
+        tentados, mudou = tentados + [list(b) for b in lista if b not in refeitos], True
+        if not refeitos:
+            break
+
+        def dentro(w):
+            return any(a <= (w.de + w.ate) / 2 <= b for a, b in refeitos)
+        palavras = sorted([p for p in palavras if not dentro(p)] + [w for w in novas if dentro(w)],
+                          key=lambda p: p.de)
+    if mudou:
+        cache.write_text(json.dumps({"assinatura": assinatura, "modelo": nome, "tentados": tentados,
+                                     "palavras": [{"texto": p.texto, "de": p.de, "ate": p.ate, "prob": p.prob}
+                                                  for p in palavras]}, ensure_ascii=False), encoding="utf-8")
+    return colar_numeros(palavras)
+
+
+_CARREGADOS = {}  # modelo de fala já aberto nesta execução (a segunda escuta usa o mesmo)
+
+
+def carregar_whisper(nome, pasta):
+    if nome in _CARREGADOS:
+        return _CARREGADOS[nome]
+    livre = memoria_livre()
+    if livre is not None and livre < MEMORIA_MINIMA:
+        raise Erro(f"só {livre:.1f} GB de memória livre: abrir o modelo de fala agora pode travar a máquina (ele "
+                   f"precisa de {MEMORIA_MINIMA:.1f} GB ou mais). Feche o que estiver pesado (render do animar, tratar, "
+                   f"abas do Chrome), confira com free -m e rode de novo: humanim editar "
+                   f"{relativo(pasta / 'gravacao.webm')}")
     caminho = caminho_modelo(nome)
     try:
         from faster_whisper import WhisperModel
     except ImportError:
-        raise Erro("falta o faster-whisper no ambiente do humanim. Instale: "
-                   "uv pip install -p .venv/bin/python -e .") from None
-    segundos = len(audio) / SR
-    print(f"transcrevendo {segundos:.0f}s de fala com o modelo {nome} na CPU ...", flush=True)
-    inicio = aviso = time.monotonic()
-    palavras = []
+        raise Erro(SEM_FASTER_WHISPER) from None
     try:
         modelo = WhisperModel(caminho, device="cpu", compute_type="int8", cpu_threads=THREADS)
+    except Exception as e:  # noqa: BLE001 — modelo quebrado ou pela metade, falta de memória: vira um ERRO legível
+        raise Erro(falha_do_modelo(nome, caminho, pasta, e)) from None
+    modelo.humanim = (nome, caminho)
+    _CARREGADOS[nome] = modelo
+    return modelo
+
+
+def whisper(modelo, audio, pasta, trechos_audio=None):
+    """Palavras com tempo (segundos da gravação) do áudio inteiro ou só dos trechos [de, ate, de, ate, ...]."""
+    segundos, aviso, palavras = len(audio) / SR, time.monotonic(), []
+    try:
         trechos, _ = modelo.transcribe(audio, language="pt", word_timestamps=True, initial_prompt=PROMPT,
-                                       condition_on_previous_text=False, vad_filter=False, beam_size=5)
+                                       condition_on_previous_text=False, vad_filter=False, beam_size=5,
+                                       clip_timestamps=trechos_audio or "0")
         for trecho in trechos:
             for w in trecho.words:
                 texto = w.word.strip()
@@ -257,13 +297,45 @@ def transcrever(audio, pasta, assinatura, nome):
             if time.monotonic() - aviso > 15:
                 aviso = time.monotonic()
                 print(f"  {trecho.end:.0f}/{segundos:.0f}s", flush=True)
-    except Exception as e:  # noqa: BLE001 — modelo quebrado ou pela metade, falta de memória: vira um ERRO legível
-        raise Erro(falha_do_modelo(nome, caminho, pasta, e)) from None
-    print(f"  transcrito em {time.monotonic() - inicio:.0f}s", flush=True)
-    cache.write_text(json.dumps({"assinatura": assinatura, "modelo": nome,
-                                 "palavras": [{"texto": p.texto, "de": p.de, "ate": p.ate, "prob": p.prob}
-                                              for p in palavras]}, ensure_ascii=False), encoding="utf-8")
-    return colar_numeros(palavras)
+    except Exception as e:  # noqa: BLE001 — modelo pela metade, falta de memória no meio: vira um ERRO legível
+        raise Erro(falha_do_modelo(*modelo.humanim, pasta, e)) from None
+    return palavras
+
+
+def buracos(som, palavras):
+    """Trechos [de, ate] para transcrever de novo: onde há fala (som de voz, não respiração) longe de toda
+    palavra transcrita, pelo menos BURACO s de voz, juntando corridas a menos de 1 s uma da outra. Começam
+    0,3 s antes do som (sem pegar a palavra de antes) e vão até o fim da primeira frase transcrita depois
+    (a palavra com . ? ou !, até 10 s depois): as palavras dessa frase podem ser as da fala pulada, com o
+    tempo errado."""
+    ordem = sorted(palavras, key=lambda p: p.de)
+    coberto = np.zeros(som.n, bool)
+    for p in ordem:
+        coberto[som.q(p.de - 0.25):som.q(p.ate + 0.25) + 1] = True
+    grupos = []
+    for k in np.nonzero(som.som & ~coberto)[0]:
+        if grupos and k - grupos[-1][1] <= round(1.0 / PASSO):
+            grupos[-1][1], grupos[-1][2] = k, grupos[-1][2] + 1
+        else:
+            grupos.append([k, k, 1])
+    saida, fim_audio = [], som.n * PASSO
+    for a, b, n in grupos:
+        if n * PASSO < BURACO:
+            continue
+        ta, tb = a * PASSO, (b + 1) * PASSO
+        antes = max([p.ate for p in ordem if p.ate <= ta] + [0.0])
+        fim = tb + 0.3
+        for p in ordem:
+            if p.de >= tb - 0.25 and p.ate <= tb + 10:
+                fim = max(fim, p.ate + 0.1)
+                if re.search(r"[.?!…]$", p.texto):
+                    break
+        de, ate = round(float(max(antes, ta - 0.3, 0.0)), 2), round(float(min(fim, fim_audio)), 2)
+        if saida and de <= saida[-1][1]:
+            saida[-1] = (saida[-1][0], max(ate, saida[-1][1]))
+        else:
+            saida.append((de, ate))
+    return saida
 
 
 def falha_do_modelo(nome, caminho, pasta, e):
@@ -284,13 +356,16 @@ def falha_do_modelo(nome, caminho, pasta, e):
 
 
 def colar_numeros(palavras):
-    """O faster-whisper parte número em palavras sem espaço entre elas ("22" ",1%.", "1" ".500.", "20" "%"):
-    cola de volta, para comparar com o roteiro pelo número inteiro."""
+    """O faster-whisper parte número em palavras sem espaço entre elas ("22" ",1%.", "1" ".500.", "20" "%"),
+    e escreve "mil e quinhentos reais" como "R" "1" ".500." (sem o "$" e sem "reais"): cola de volta, para
+    comparar com o roteiro pelo número inteiro e com a moeda ("R$1.500.")."""
     saida = []
     for p in palavras:
         a = saida[-1] if saida else None
-        if a and re.match(r"[.,]\d|%", p.texto) and a.texto[-1:].isdigit() and p.de - a.ate < 0.5:
-            saida[-1] = Palavra(a.texto + p.texto, a.de, max(a.ate, p.ate), min(a.prob, p.prob))
+        if a and p.de - a.ate < 0.5 and (re.match(r"[.,]\d|%", p.texto) and a.texto[-1:].isdigit()
+                                         or re.fullmatch(r"(R|US)\$?", a.texto) and p.texto[:1].isdigit()):
+            junto = a.texto + ("$" if a.texto[-1] != "$" and p.texto[:1].isdigit() else "") + p.texto
+            saida[-1] = Palavra(junto, a.de, max(a.ate, p.ate), min(a.prob, p.prob))
         else:
             saida.append(p)
     return saida
@@ -298,8 +373,15 @@ def colar_numeros(palavras):
 
 # ---------------------------------------------------------------- energia
 
+def quadros(segundos):
+    """Segundos em quadros de energia (de PASSO em PASSO)."""
+    return round(segundos / PASSO)
+
+
 class Som:
-    """Energia do áudio em dB de 10 em 10 ms, onde há som e se o som é voz (vogal) ou ruído (respiração)."""
+    """Energia do áudio em dB de 10 em 10 ms, onde há som e se o som é voz (vogal) ou ruído (respiração).
+
+    Respiração não conta como som (som, fraco): para o corte ela é pausa, e sai com a pausa em volta."""
 
     def __init__(self, audio):
         passo, janela = int(SR * PASSO), int(SR * 0.025)
@@ -311,15 +393,67 @@ class Som:
         self.zcr = np.mean(sinais[:, 1:] != sinais[:, :-1], axis=1)
         piso, voz = np.percentile(self.db, 10), np.percentile(self.db, 97)
         self.limiar = min(piso + max(8.0, 0.3 * (voz - piso)), voz - 15)
-        som = self.db > self.limiar
-        som = self._tapar(som, True, 4)  # oclusiva (p, t, k) no meio da palavra não é silêncio
-        self.som = self._tapar(som, False, 3)  # estalo de 20 ms não é som
+        self.n = n
+        self.alto = self.db > self.limiar  # sem tapar nada: aqui aparece o vale entre dois sons encostados
+        fraco = self.db > piso + 0.4 * (self.limiar - piso)
+        self.resp = self._respiracoes(fraco, voz)
+        som = self._tapar(self.alto & ~self.resp, True, quadros(TAPA_OCLUSIVA))  # oclusiva (p, t, k) no meio da
+        self.som = self._tapar(som, False, quadros(TAPA_ESTALO))  # palavra não é silêncio; estalo não é som
         # Som fraco: acima do ruído de fundo mas abaixo do limiar (vogal final átona, "ris-c-o", numa sala
         # com ruído). Só serve para não cortar o fim de uma palavra (Som.cauda).
-        fraco = self._tapar(self.db > piso + 0.4 * (self.limiar - piso), False, 3)
-        self.fraco = fraco | self.som
-        self.n = n
-        self.inicios = []  # onde cada palavra da transcrição começa (main preenche), em ordem
+        self.fraco = self._tapar(fraco & ~self.resp, False, quadros(TAPA_ESTALO)) | self.som
+        self.inicios = []  # onde cada palavra da transcrição começa (preparar), em ordem
+        self.reais = []  # onde começa de verdade (pela energia) a primeira palavra a partir de cada uma delas
+        self._inicio, self._fim = {}, {}  # id da palavra -> onde ela começa / termina de verdade
+
+    def preparar(self, palavras):
+        """Guarda as palavras da transcrição e onde cada uma começa de verdade. A transcrição (o modelo leve
+        mais ainda) estica a palavra para trás por cima da pausa: o fim da palavra de antes não pode parar
+        ali, e sim onde o som da seguinte começa."""
+        ordem = sorted(palavras, key=lambda p: p.de)
+        self.inicios = [p.de for p in ordem]
+        self.reais = [math.inf] * (len(ordem) + 1)
+        for i in range(len(ordem) - 1, -1, -1):  # de trás para a frente: o onset de uma olha a seguinte
+            self.reais[i] = min(self.reais[i + 1], self.inicio(ordem[i]))
+
+    def inicio(self, w):
+        """Onde o som da palavra w começa, nunca antes do que a transcrição diz (em cima de outra fala, a
+        fronteira da transcrição é o melhor que se tem)."""
+        if id(w) not in self._inicio:
+            self._inicio[id(w)] = max(w.de, self.onset(w, w.de))
+        return self._inicio[id(w)]
+
+    def fim(self, w):
+        """Onde o som da palavra w termina, nunca depois do que a transcrição diz."""
+        if id(w) not in self._fim:
+            self._fim[id(w)] = min(w.ate, self.offset(w, w.ate))
+        return self._fim[id(w)]
+
+    def _respiracoes(self, fraco, voz):
+        """Quadros de respiração. Cada som entre dois vales (corrida acima do limiar, sem tapar: a respiração
+        encostada na palavra fica separada dela pelo vale) é respiração se é ruído (quase nenhum quadro de
+        voz), sem o chiado do s/x/ch ("tóra-x", "gru-p-s" depois do p/t/k são fala), de pelo menos RESPIRO e,
+        se mais curto que RESPIRO_LONGA, QUIETA dB abaixo da voz. Vai até o fundo dos vales em volta."""
+        resp, k, n = np.zeros(self.n, bool), 0, self.n
+        while k < n:
+            if not self.alto[k]:
+                k += 1
+                continue
+            a = k
+            while k < n and self.alto[k]:
+                k += 1
+            db, zcr = self.db[a:k], self.zcr[a:k]
+            if (k - a < round(RESPIRO / PASSO) or np.mean(zcr < VOZ) >= 0.15
+                    or np.median(zcr[db >= db.max() - 10]) >= SIBILO
+                    or (k - a < round(RESPIRO_LONGA / PASSO) and db.max() > voz - QUIETA)):
+                continue
+            i, j = a, k
+            while i > 0 and fraco[i - 1] and self.db[i - 1] < self.db[i]:
+                i -= 1
+            while j < n and fraco[j] and self.db[j] < self.db[j - 1]:
+                j += 1
+            resp[i:j] = True
+        return resp
 
     @staticmethod
     def _tapar(mascara, valor, maximo):
@@ -354,10 +488,10 @@ class Som:
                 j += 1
             k = j if self.som[j] else k
         # A transcrição às vezes começa a palavra na respiração (ou muleta) de antes: a palavra começa depois
-        # do último silêncio de 200 ms, ou de OCLUSIVA se o som antes dele é ruído (respiração, sem voz; um
-        # silêncio mais curto pode ser o p/t/k depois de um "s": "es-t-á"). O som depois do silêncio tem que
-        # ser desta palavra: som que só começa onde a palavra seguinte começa é dela (a transcrição esticou
-        # esta por cima da pausa), e pular para ele inverteria o trecho.
+        # do último silêncio de 200 ms, ou de OCLUSIVA se o som antes dele é ruído (sem voz; um silêncio mais
+        # curto pode ser o p/t/k depois de um "s": "es-t-á"). A respiração que Som achou já é silêncio. O som
+        # depois do silêncio tem que ser desta palavra: som que só começa onde a palavra seguinte começa é
+        # dela (a transcrição esticou esta por cima da pausa), e pular para ele inverteria o trecho.
         fim = self.q(min(w.ate + 0.05, self.seguinte(w)))
         j, ultimo, ini, curto = k, None, k, round(OCLUSIVA / PASSO)
         while j < fim:
@@ -365,21 +499,22 @@ class Som:
                 s = j
                 while j < fim and not self.som[j]:
                     j += 1
-                if j < fim and self.som[j] and (j - s >= 20 or (j - s >= curto and self.ruido(ini, s))):
+                if j < fim and self.som[j] and (j - s >= quadros(SILENCIO_ANTES)
+                                                or (j - s >= curto and self.ruido(ini, s))):
                     ultimo, ini = j, j
             else:
                 j += 1
         return (ultimo if ultimo is not None else k) * PASSO
 
     def seguinte(self, w):
-        """Onde começa a palavra da transcrição depois de w (infinito se não tem)."""
+        """Onde começa de verdade a palavra da transcrição depois de w (infinito se não tem)."""
         k = bisect.bisect_right(self.inicios, w.de + 1e-6)
-        return self.inicios[k] if k < len(self.inicios) else math.inf
+        return self.reais[k] if k < len(self.reais) else math.inf
 
     def ruido(self, a, b):
         """Se o som entre os quadros a e b é ruído sem voz (respiração), pelo cruzamento por zero."""
         som = np.nonzero(self.som[a:b])[0] + a
-        return len(som) > 0 and float(np.median(self.zcr[som])) >= 0.12
+        return len(som) > 0 and float(np.median(self.zcr[som])) >= VOZ
 
     def offset(self, w, limite):
         """Onde a palavra termina de verdade."""
@@ -398,16 +533,22 @@ class Som:
         # dela, uma muleta logo depois, não: a pausa entre as duas é o que decide se a muleta sai).
         antes_de = min(limite, self.seguinte(w))
         k = self.cauda(k, self.q(min(antes_de - 0.05, w.ate + 0.25)), self.q(min(antes_de, w.ate + 0.5)))
-        # depois da palavra veio silêncio de 250 ms e outro som (respiração): termina antes do silêncio.
-        # Procura a partir de onde a palavra começa de verdade (a transcrição às vezes começa a palavra
-        # na respiração de antes, e aí o silêncio entre as duas não é o fim dela).
+        # A transcrição às vezes dá o fim bem antes, no fim da frase ("sessenta e seis" terminando 0,6 s antes
+        # do "s" final, que saía): som que continua sem vale nenhum ainda é a palavra, até antes da seguinte.
+        fim = self.q(min(antes_de - 0.05, w.ate + CONTINUA))
+        while k + 1 <= fim and self.som[k + 1]:
+            k += 1
+        # depois da palavra veio silêncio de 250 ms e outro som (ou de OCLUSIVA e ruído): termina antes do
+        # silêncio. Procura a partir de onde a palavra começa de verdade (a transcrição às vezes começa a
+        # palavra na respiração de antes, e aí o silêncio entre as duas não é o fim dela).
         j, falou, curto = self.q(self.onset(w, w.de - 0.2)), 0, round(OCLUSIVA / PASSO)
         while j < k:
             if not self.som[j]:
                 s = j
                 while j < k and not self.som[j]:
                     j += 1
-                if falou >= 5 and self.som[j] and (j - s >= 25 or (j - s >= curto and self.ruido(j, k + 1))):
+                if falou >= quadros(FALA_ANTES) and self.som[j] and (
+                        j - s >= quadros(SILENCIO_DEPOIS) or (j - s >= curto and self.ruido(j, k + 1))):
                     return s * PASSO
             else:
                 falou += 1
@@ -416,7 +557,8 @@ class Som:
 
     def cauda(self, k, volta, fim):
         """Último quadro da palavra cujo som vai até k: o som (mesmo fraco) que volta depois de um quase
-        silêncio de menos de OCLUSIVA, começando até o quadro `volta`, ainda é dela (vai no máximo até `fim`)."""
+        silêncio de menos de OCLUSIVA, começando até o quadro `volta`, ainda é dela (vai no máximo até `fim`).
+        Respiração encostada na palavra não é som (Som._respiracoes): não volta."""
         curto = round(OCLUSIVA / PASSO)
         while True:
             j = k + 1
@@ -437,21 +579,75 @@ class Som:
         cand = np.nonzero(trecho <= trecho.min() + 3)[0] + ka
         return float(cand[np.argmin(np.abs(cand * PASSO - alvo))] * PASSO)
 
+    def proprio(self, ws, esq=None, dir=None):
+        """Segundos de som só das palavras ws: das corridas de som (sem tapar, sem respiração) que tocam o
+        intervalo delas na transcrição, as que não começam antes do meio da palavra `esq` (a de antes) nem
+        terminam depois do meio da `dir` (a de depois): essas são o som da vizinha, sem vale até ws."""
+        sons = self.alto & ~self.resp
+        a, b = self.q(ws[0].de), max(self.q(ws[-1].ate), self.q(ws[0].de) + 1)
+        lo = self.q((esq.de + esq.ate) / 2) if esq else -1
+        hi = self.q((dir.de + dir.ate) / 2) if dir else self.n
+        while a > 0 and sons[a] and sons[a - 1]:
+            a -= 1
+        total, k = 0, a
+        while k < b:
+            if not sons[k]:
+                k += 1
+                continue
+            s = k
+            while k < self.n and sons[k]:
+                k += 1
+            if s > lo and k <= hi:
+                total += k - s
+        return total * PASSO
+
+    def pausa(self, w, sentido):
+        """Segundos sem fala de w até o som mais perto, depois dela (sentido 1) ou antes (-1)."""
+        k = self.q(self.offset(w, 1e9)) if sentido > 0 else self.q(self.onset(w, 0)) - 1
+        j = k
+        while 0 <= j < self.n and not self.som[j]:
+            j += sentido
+        return abs(j - k) * PASSO if 0 <= j < self.n else math.inf
+
+    def vao(self, a, b):
+        """Segundos sem fala entre a palavra a e a seguinte b, pela energia: do fim de verdade de a ao começo
+        de verdade de b, sem outro limite além dos de onset e offset (0 e 1e9: nenhum)."""
+        return self.onset(b, 0) - self.offset(a, 1e9)
+
     def conteudo(self, a, b):
         """O que tem entre a e b, sem palavra: 'respiracao' (ruído), 'muleta' (voz) ou 'silencio'."""
         ka, kb = self.q(a), self.q(b)
-        som = np.nonzero(self.som[ka:kb])[0] + ka
-        if len(som) * PASSO < 0.08:
+        som, resp = np.count_nonzero(self.som[ka:kb]), np.count_nonzero(self.resp[ka:kb])
+        if (som + resp) * PASSO < 0.08:
             return "silencio"
-        return "respiracao" if self.ruido(ka, kb) else "muleta"
+        return "respiracao" if resp >= som or self.ruido(ka, kb) else "muleta"
 
 
 # ---------------------------------------------------------------- alinhamento
 
+def fonetico(p):
+    """O fim da palavra como se fala: e e o finais átonos soam i e u ("mede a" se ouve "média")."""
+    return re.sub(r"o$", "u", re.sub(r"e$", "i", p))
+
+
 def junta(alvo, a, b):
-    """Se os pedaços a + b são a palavra alvo partida em dois."""
-    inteiro = parecido(alvo, a + b)
+    """Se os pedaços a + b são a palavra alvo partida em dois (ou duas palavras ditas como uma)."""
+    inteiro = max(parecido(alvo, a + b), parecido(fonetico(alvo), fonetico(a) + fonetico(b)))
     return inteiro >= 0.85 and inteiro > max(parecido(alvo, a), parecido(alvo, b))
+
+
+def primeira_copia(W):
+    """Índices dos tokens falados que se repetem logo em seguida (1 a 4 palavras, sem contar muleta):
+    "Vai prever. Vai prever calote" -> os do primeiro "Vai prever". É a tentativa que o recomeço desfaz."""
+    ks = [j for j, t in enumerate(W) if not muleta(t[0])]
+    saida, usados = set(), set()
+    for k in range(4, 0, -1):  # a repetição mais longa primeiro, sem sobrepor ("A máquina. A máquina. A
+        for p in range(len(ks) - 2 * k + 1):  # prender": é "A máquina" duas vezes, não "máquina. A")
+            if (not usados & set(range(p, p + 2 * k))
+                    and all(parecido(W[ks[p + d]][0], W[ks[p + k + d]][0]) >= PARECIDO for d in range(k))):
+                saida.update(ks[p:p + k])
+                usados.update(range(p, p + 2 * k))
+    return saida
 
 
 def alinhar(S, W, vizinhas=frozenset()):
@@ -468,6 +664,7 @@ def alinhar(S, W, vizinhas=frozenset()):
     """
     m, n = len(S), len(W)
     inf = float("inf")
+    repetidas = primeira_copia(W)
     # estado: 0 = nada casado ainda; 1 = casou igual; 2 = casou e depois 1 palavra fora; 3 = 2 ou mais
     custo = [[[inf] * 4 for _ in range(n + 1)] for _ in range(m + 1)]
     volta = [[[None] * 4 for _ in range(n + 1)] for _ in range(m + 1)]
@@ -484,7 +681,7 @@ def alinhar(S, W, vizinhas=frozenset()):
                 c = custo[i][j][e]
                 if c == inf:
                     continue
-                casar = c + eps * (n - j) + (0.05 if j in vizinhas else 0)
+                casar = c + eps * (n - j) + (0.05 if j in vizinhas else 0) + (REPETIDA if j in repetidas else 0)
                 volta_ao_roteiro = casar + (ILHA if e == 3 else 0)
                 if i < m and j < n:
                     if parecido(S[i][0], W[j][0]) >= PARECIDO:
@@ -541,21 +738,47 @@ def falados(ps):
     return W, dono
 
 
-def casadas(fala, ps, vizinhas=()):
-    """Índices das palavras de ps que o alinhamento com a fala casa (igual ou junta)."""
+def casadas(fala, ps, vizinhas=(), som=None):
+    """Índices das palavras de ps que o alinhamento com a fala casa (igual ou junta).
+
+    Com `som`, também a vizinha que não casa (fora muleta) mas está grudada (sem pausa, pela energia) numa
+    palavra desta linha: é a mesma frase, dita em cima da tecla ("quase não erra" com o Espaço antes do
+    "erra"), ou fala desta linha que a transcrição errou ("A" no lugar de "Pra", com o R apertado depois de
+    recomeçar). E a que o alinhamento troca por uma palavra do roteiro que faltaria aqui, se a pausa entre
+    ela e esta linha é menor que a do outro lado ("aprende? Regras." no lugar de "Padrões.", com o Espaço
+    apertado na pausa da pergunta)."""
     W, dono = falados(ps)
     tv = frozenset(j for j, k in enumerate(dono) if k in vizinhas)
-    return {dono[j] for passo, _, _, j0, j1 in alinhar(tokens(fala), W, tv) if passo in ("igual", "junta")
-            for j in range(j0, j1)}
+    passos = alinhar(tokens(fala), W, tv)
+    casa = {dono[j] for passo, _, _, j0, j1 in passos if passo in ("igual", "junta") for j in range(j0, j1)}
+    if som is None:
+        return casa
+    trocadas = {dono[j0] for passo, _, _, j0, _ in passos if passo == "trocada"}
+    soltas = {i for i in vizinhas if not all(muleta(t) for t in ps[i].toks)}
+    mudou = True
+    while mudou:  # de dentro para fora: cada uma tem que encostar numa que já é desta linha
+        mudou = False
+        for i in sorted(soltas - casa):
+            for v in (i - 1, i + 1):
+                if not 0 <= v < len(ps) or (v in vizinhas and v not in casa):
+                    continue
+                a, b = ps[min(i, v)], ps[max(i, v)]
+                dentro = som.vao(a, b)
+                if dentro < OCLUSIVA or (i in trocadas and dentro < som.pausa(ps[i], 1 if v < i else -1)):
+                    casa.add(i)
+                    mudou = True
+                    break
+    return casa
 
 
-def redistribuir(linhas, palavras):
+def redistribuir(linhas, palavras, som):
     """Palavra dita em cima da tecla vai para a linha a que ela pertence.
 
     Cada palavra é da linha em que cai o meio dela. Mas o Espaço apertado antes do fim da fala põe a
     última palavra na linha seguinte, e o R apertado depois de recomeçar deixa a primeira entre as linhas
     (em nenhuma). Palavra a até FRONTEIRA da tecla que não casa com o roteiro da linha dela (ou que não é
-    de linha nenhuma) é oferecida à vizinha, e fica com ela se lá casa (o alinhamento decide).
+    de linha nenhuma), e a fala emendada nela, é oferecida à vizinha, e fica com ela se lá casa (o
+    alinhamento decide), ou se é a mesma frase da vizinha (casadas).
     """
     meio = [(w.de + w.ate) / 2 for w in palavras]
     indice = {id(w): k for k, w in enumerate(palavras)}
@@ -568,19 +791,32 @@ def redistribuir(linhas, palavras):
         def livre(k):
             return id(palavras[k]) not in presas and id(palavras[k]) not in dona
 
-        # antes: da linha anterior ou de entre as duas (aí, se está mais perto desta tecla que da anterior),
-        # tocando os FRONTEIRA s antes da tecla (a transcrição às vezes estica a palavra para trás na pausa)
-        antes = [k for k, w in enumerate(palavras) if meio[k] < x.de and w.ate > x.de - FRONTEIRA and livre(k)
-                 and (meio[k] < ant or x.de - meio[k] <= meio[k] - ant)]
-        depois = [k for k, w in enumerate(palavras) if meio[k] >= x.ate and w.de < x.ate + FRONTEIRA and livre(k)
-                  and (meio[k] >= prox or meio[k] - x.ate < prox - meio[k])]
+        def antes_ok(k):  # da linha anterior ou de entre as duas (aí, mais perto desta tecla que da anterior)
+            return meio[k] < x.de and livre(k) and (meio[k] < ant or x.de - meio[k] <= meio[k] - ant)
+
+        def depois_ok(k):
+            return meio[k] >= x.ate and livre(k) and (meio[k] >= prox or meio[k] - x.ate < prox - meio[k])
+
+        def emendadas(a, b):  # palavras[a] e palavras[b] sem pausa entre elas, pela energia
+            return som.vao(palavras[a], palavras[b]) < OCLUSIVA
+
+        # tocando os FRONTEIRA s antes da tecla (a transcrição às vezes estica a palavra para trás na pausa),
+        # e a fala emendada nelas do lado de fora: com o R apertado 0,8 s depois de recomeçar ou o Espaço 1 s
+        # antes do fim, a frase inteira fica do outro lado da tecla, não só a palavra da ponta
+        antes = [k for k, w in enumerate(palavras) if w.ate > x.de - FRONTEIRA and antes_ok(k)]
+        while antes and antes[0] > 0 and antes_ok(antes[0] - 1) and emendadas(antes[0] - 1, antes[0]):
+            antes.insert(0, antes[0] - 1)
+        depois = [k for k, w in enumerate(palavras) if w.de < x.ate + FRONTEIRA and depois_ok(k)]
+        while (depois and depois[-1] + 1 < len(palavras) and depois_ok(depois[-1] + 1)
+               and emendadas(depois[-1], depois[-1] + 1)):
+            depois.append(depois[-1] + 1)
         if not antes and not depois:
             continue
         proprias = [indice[id(w)] for w in x.palavras if id(w) not in dona]
         ks = sorted(set(antes + proprias + depois))
         ps = [palavras[k] for k in ks]
         vizinhas = {i for i, k in enumerate(ks) if k in antes or k in depois}
-        for i in casadas(x.fala, ps, vizinhas) & vizinhas:
+        for i in casadas(x.fala, ps, vizinhas, som) & vizinhas:
             dona[id(ps[i])] = n
     if dona:
         for n, x in enumerate(linhas):
@@ -595,19 +831,23 @@ def decidir(linha, som):
     passos = alinhar(S, W)
     pontuacao = {}  # palavra -> pontuação do roteiro depois dela
     faltas = [0] * (len(linha.palavras) + 1)  # tokens do roteiro que faltam antes da palavra k
-    diferencas = []
+    diferencas, trocadas = [], set()
     for passo, i0, i1, j0, j1 in passos:
         if passo in ("igual", "trocada", "junta"):
             for j in range(j0, j1):
                 linha.palavras[dono[j]].fica = True
                 pontuacao[dono[j]] = S[i1 - 1][2] or pontuacao.get(dono[j], "")
             if passo == "trocada":
+                trocadas.update(dono[j] for j in range(j0, j1))
                 diferencas.append({"tipo": "trocada", "roteiro": S[i0][1], "falado": W[j0][1],
                                    "parecido": round(parecido(S[i0][0], W[j0][0]), 2), "token": S[i0][0],
                                    "certeza": linha.palavras[dono[j0]].prob})
         elif passo == "falta":
             faltas[dono[j0] if j0 < len(dono) else len(linha.palavras)] += 1
             diferencas.append({"tipo": "faltando", "roteiro": S[i0][1], "token": S[i0][0]})
+    for k, w in enumerate(linha.palavras):
+        if "$" in w.texto:  # "R$ 1.500" transcrito: o tempo é o do número, e o "reais" é dito depois dele
+            faltas[k + 1] += 1
 
     # As que sobraram, em corridas: sai o que é muleta, repetição, começo errado ou fala fora do roteiro
     # com pausa em volta. O resto fica (é fala que a transcrição errou): nunca cortar fala na dúvida.
@@ -622,7 +862,8 @@ def decidir(linha, som):
         corrida = ps[k:j]
         ant = ps[k - 1] if k > 0 else None
         prox = ps[j] if j < len(ps) else None
-        tipo = classificar(corrida, ant, prox, sum(faltas[k:j + 1]) if prox else sum(faltas[k:]), som)
+        tipo = classificar(corrida, ant, prox, sum(faltas[k:j + 1]) if prox else sum(faltas[k:]), som,
+                           duvida=k - 1 in trocadas or j in trocadas)
         for w in corrida:
             if tipo:
                 w.corte = tipo
@@ -633,18 +874,25 @@ def decidir(linha, som):
     return diferencas, faltas, pontuacao
 
 
-def classificar(corrida, ant, prox, faltam, som):
+def classificar(corrida, ant, prox, faltam, som, duvida=False):
     """Tipo do corte de uma corrida de palavras fora do alinhamento, ou '' se ela fica.
 
     `faltam`: tokens do roteiro que não foram ditos ali perto (aí a corrida pode ser a fala que a
-    transcrição errou, e só sai se tem pausa em volta)."""
+    transcrição errou, e só sai se tem pausa em volta). `duvida`: uma vizinha é palavra trocada (a
+    transcrição errou ali, e a corrida pode ser pedaço da fala certa: "sem truque" ouvido "Sinto o que")."""
     nucleo = [t for w in corrida for t in w.toks if not muleta(t)]
-    antes = som.onset(corrida[0], 0) - som.offset(ant, 1e9) if ant else 9.0
-    depois = som.onset(prox, 0) - som.offset(corrida[-1], 1e9) if prox else 9.0
+    antes = som.vao(ant, corrida[0]) if ant else 9.0
+    depois = som.vao(corrida[-1], prox) if prox else 9.0
     if not nucleo:
         # "e"/"é" curto grudado na fala dos dois lados costuma ser invenção da transcrição (ou o fim de
         # uma palavra): fica. Muleta de verdade tem pausa em volta ou é arrastada ("ééé").
         if max(antes, depois) < 0.06 and corrida[-1].ate - corrida[0].de < 0.3:
+            return ""
+        # Grudada de um lado só, quase sem som próprio: é o fim (ou o começo) da palavra em que gruda que a
+        # transcrição chamou de "e" ("árvo-re" + "e" na pausa da vírgula, "cli-entes" ouvido "e antes": o
+        # som não para entre as duas). Também fica. A muleta encostada na palavra ("dados é... mostram")
+        # tem som separado dela por um vale.
+        if min(antes, depois) < 0.06 and som.proprio(corrida, ant, prox) < 0.15:
             return ""
         return "muleta"
     if prox is not None:
@@ -659,7 +907,7 @@ def classificar(corrida, ant, prox, faltam, som):
         return "fora_do_roteiro" if (depois if ant is None else antes) >= 0.15 else ""
     # No meio, com o roteiro inteiro casado em volta: é fala a mais (repetição mal transcrita, um "pera").
     # Sai se tem uma pausa de pelo menos um lado; grudada nos dois, pode ser pedaço de palavra partida.
-    if faltam == 0 and len(corrida) <= 2 and max(antes, depois) >= 0.08:
+    if faltam == 0 and not duvida and len(corrida) <= 2 and max(antes, depois) >= 0.08:
         vizinhos = ant.toks[-1:] + prox.toks[:1]
         return "repeticao" if any(parecido(t, v) >= 0.5 for t in nucleo for v in vizinhos) else "fora_do_roteiro"
     # Faltando palavra do roteiro ali, a corrida pode ser ela mal transcrita: só sai bem separada.
@@ -684,18 +932,20 @@ def editar_linha(linha, som, obstaculos, faltas, pontuacao):
     lo = min(linha.de, ps[ficam[0]].de - 0.2) - MARGEM
     hi = min(max(linha.ate, ps[ficam[-1]].ate + 0.5) + MARGEM, (som.n - 3) * PASSO)  # não passa do fim da gravação
 
+    # O obstáculo vai de onde o som dele começa até onde termina (a transcrição estica a palavra por cima
+    # da pausa, e aí ela cortaria o fim ou o começo da fala que fica), nunca além do que a transcrição diz.
     def limite_esq(t):
-        return max([lo] + [o.ate for o in obstaculos if o.ate <= t + 0.05 and o.de < t])
+        return max([lo] + [som.fim(o) for o in obstaculos if o.ate <= t + 0.05 and o.de < t])
 
     def limite_dir(t):
-        return min([hi] + [o.de for o in obstaculos if o.de >= t - 0.05 and o.ate > t])
+        return min([hi] + [som.inicio(o) for o in obstaculos if o.de >= t - 0.05 and o.ate > t])
 
     pedacos = []  # ((corte, onde a fala começa), (corte, onde a fala termina)) em segundos
     k0 = ficam[0]
     lim = limite_esq(ps[k0].de)
     on = som.onset(ps[k0], lim)
     if sum(faltas[:k0 + 1]):  # falta palavra do roteiro antes da primeira: o som logo antes fica
-        on = estender_esq(som, on, max(lim, on - 0.45 * sum(faltas[:k0 + 1]) - 0.2))
+        on = estender_esq(som, on, max(lim, on - POR_FALTA * sum(faltas[:k0 + 1]) - 0.2))
     inicio = (som.quieto(max(lim, on - INICIO - 0.04), on - 0.02, on - INICIO), on)
     for ia, ib in zip(ficam, ficam[1:]):
         A, B, meio = ps[ia], ps[ib], ps[ia + 1:ib]  # meio: as que saem entre A e B
@@ -716,10 +966,10 @@ def editar_linha(linha, som, obstaculos, faltas, pontuacao):
         on_b = som.onset(B, A.de + 0.05)
         off_a = som.offset(A, on_b)
         if sum(faltas[ia + 1:ib + 1]):
-            # falta palavra do roteiro aqui: o som do meio pode ser ela. Só encurta silêncio puro.
+            # falta palavra do roteiro aqui: o som do meio pode ser ela. Só encurta silêncio (e respiração).
             for s0, s1 in silencios(som, off_a, on_b, alvo + FOLGA):
-                pedacos.append((inicio, (s0 + alvo / 2, s0)))
-                inicio = (s1 - alvo / 2, s1)
+                pedacos.append((inicio, (som.quieto(s0 + 0.02, s0 + alvo / 2 + 0.04, s0 + alvo / 2), s0)))
+                inicio = (som.quieto(s1 - alvo / 2 - 0.04, s1 - 0.02, s1 - alvo / 2), s1)
             continue
         if on_b - off_a > alvo + FOLGA:
             fim_a = som.quieto(off_a + 0.02, off_a + alvo / 2 + 0.04, off_a + alvo / 2)
@@ -731,7 +981,7 @@ def editar_linha(linha, som, obstaculos, faltas, pontuacao):
     lim = limite_dir(ps[kz].ate)
     off = som.offset(ps[kz], lim)
     if sum(faltas[kz + 1:]):
-        off = estender_dir(som, off, min(lim, off + 0.45 * sum(faltas[kz + 1:]) + 0.2))
+        off = estender_dir(som, off, min(lim, off + POR_FALTA * sum(faltas[kz + 1:]) + 0.2))
     pedacos.append((inicio, (som.quieto(off + 0.02, max(off + 0.02, min(lim, off + FIM + 0.04)), off + FIM), off)))
     # Pedaço em que a fala acaba antes de começar não tem palavra que fica (o começo e o fim vieram de
     # palavras diferentes, com a transcrição errando o tempo): sai, e os dois cortes em volta viram um.
@@ -762,7 +1012,7 @@ def estender_esq(som, t, limite):
     while k > lim:
         k -= 1
         quieto = 0 if som.som[k] else quieto + 1
-        if quieto > 15:
+        if quieto > quadros(VAO_ESTENDER):
             break
         if som.som[k]:
             melhor = k
@@ -775,7 +1025,7 @@ def estender_dir(som, t, limite):
     while k < lim:
         k += 1
         quieto = 0 if som.som[k] else quieto + 1
-        if quieto > 15:
+        if quieto > quadros(VAO_ESTENDER):
             break
         if som.som[k]:
             melhor = k + 1
@@ -797,14 +1047,15 @@ def silencios(som, a, b, minimo):
     return saida
 
 
-def descrever_cortes(linha, trechos, som):
-    """O que saiu da janela da linha, pedaço por pedaço, com o tipo."""
+def descrever_cortes(linha, trechos, som, outros=()):
+    """O que saiu da janela da linha, pedaço por pedaço, com o tipo. `outros`: os trechos das outras linhas
+    (a fala dita em cima da tecla que foi para a vizinha não saiu)."""
     ini, fim = min(linha.de, trechos[0][0] / FPS), max(linha.ate, trechos[-1][1] / FPS)
     buracos, t = [], ini
-    for a, b in trechos:
+    for a, b in sorted(list(trechos) + [o for o in outros if o[1] / FPS > ini and o[0] / FPS < fim]):
         if a / FPS > t + 1e-6:
             buracos.append((t, a / FPS))
-        t = b / FPS
+        t = max(t, b / FPS)
     if fim > t + 1e-6:
         buracos.append((t, fim))
     cortes = []
@@ -823,7 +1074,10 @@ def descrever_cortes(linha, trechos, som):
 
 
 def importante(d):
-    """Diferença que muda o que se diz: número, palavra de conteúdo, 'não'."""
+    """Diferença que muda o que se diz: número, palavra de conteúdo, 'não'. A que a segunda escuta desfez
+    (era erro da transcrição) não conta."""
+    if d.get("conferida"):
+        return False
     if d["tipo"] == "sem_fala":
         return True
     t = d.get("token", "")
@@ -876,14 +1130,19 @@ def main(args):
     audio = carregar_audio(gravacao)
     som = Som(audio)
     modelo, aviso = escolher_modelo(pasta, assinatura["gravacao"])
-    palavras = transcrever(audio, pasta, assinatura["gravacao"], modelo)
-    som.inicios = sorted(p.de for p in palavras)
+    palavras = transcrever(audio, pasta, assinatura["gravacao"], modelo, som)
+    # Palavra inventada em cima de respiração ou silêncio (o small repete a palavra de antes com certeza
+    # baixa: "diferentes." sobre a respiração que abre a linha seguinte): sem voz embaixo, não é fala. Só
+    # com tempo para julgar: palavra de 20 ms ("30" grudado no "mil") é tempo que a transcrição espremeu.
+    palavras = [w for w in palavras if w.prob >= FANTASMA or w.ate - w.de < 0.2
+                or np.count_nonzero(som.som[som.q(w.de):som.q(w.ate) + 1]) * PASSO >= 0.05]
+    som.preparar(palavras)
 
     linhas = []
     for lr, t in zip(linhas_roteiro, tempos):
         dentro = [w for w in palavras if t.de <= (w.de + w.ate) / 2 < t.ate]
         linhas.append(Linha(lr.numero, lr.marca, lr.fala, t.de, t.ate, dentro))
-    redistribuir(linhas, palavras)
+    redistribuir(linhas, palavras, som)
     decisoes = []
     for linha in linhas:
         diferencas, faltas, pontuacao = decidir(linha, som)
@@ -901,8 +1160,14 @@ def main(args):
             x.trechos[-1] = (x.trechos[-1][0], max(meio, x.trechos[-1][0] + 1))
             y.trechos[0] = (min(max(meio, x.trechos[-1][1]), y.trechos[0][1] - 1), y.trechos[0][1])
     for linha in linhas:
-        linha.cortes = descrever_cortes(linha, linha.trechos, som)
+        outros = [t for x in linhas if x is not linha for t in x.trechos]
+        linha.cortes = descrever_cortes(linha, linha.trechos, som, outros)
         linha.diferencas = agrupar(linha.diferencas)
+    ouvidas = segunda_escuta(linhas, audio, pasta, assinatura["gravacao"], modelo)
+    for linha in linhas:
+        if linha.numero in ouvidas and ouvidas[linha.numero][1]:
+            for d in linha.diferencas:
+                d["conferida"] = True
 
     dados = {"versao": 1, **assinatura, "modelo": modelo, "fps": FPS, "linhas": []}
     for linha in linhas:
@@ -915,15 +1180,93 @@ def main(args):
             "diferencas": [{k: v for k, v in d.items() if k != "token"} | {"importante": importante(d)}
                            for d in linha.diferencas],
             "cortes": linha.cortes,
-        })
+        } | ({"segunda_escuta": {"ouvido": ouvidas[linha.numero][0], "bate": ouvidas[linha.numero][1]}}
+             if linha.numero in ouvidas else {}))
     destino = pasta / EDICAO
     provisorio = destino.with_name(EDICAO + ".tmp")
     provisorio.write_text(json.dumps(dados, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    guardado = guardar_ajuste(destino, dados)
     os.replace(provisorio, destino)
-    ok("\n".join(resumo(pasta, linhas) + ([aviso] if aviso else [])))
+    ok("\n".join(resumo(pasta, linhas, ouvidas) + ([guardado] if guardado else []) + ([aviso] if aviso else [])))
 
 
-def resumo(pasta, linhas):
+def guardar_ajuste(destino, dados):
+    """O edicao.json de antes vai para edicao-anterior.json se os trechos dele são outros (um ajuste à mão
+    não se perde ao rodar o editar de novo). Devolve o aviso para o relatório, ou ''."""
+    try:
+        velho = json.loads(destino.read_text(encoding="utf-8"))
+        iguais = [(x["linha"], x["trechos"]) for x in velho["linhas"]] == [(x["linha"], x["trechos"])
+                                                                           for x in dados["linhas"]]
+    except FileNotFoundError:
+        return ""
+    except (ValueError, KeyError, TypeError):
+        iguais = False
+    if iguais:
+        return ""
+    anterior = destino.with_name("edicao-anterior.json")
+    os.replace(destino, anterior)
+    return (f"O {EDICAO} de antes tinha outros trechos (ajuste à mão, ou de outra gravação ou modelo): ficou em "
+            f"{relativo(anterior)}. Para voltar a ele: mv {relativo(anterior)} {relativo(destino)}")
+
+
+def segunda_escuta(linhas, audio, pasta, assinatura, nome):
+    """Linha com diferença importante é ouvida de novo: só a fala que fica, com a fala do roteiro como dica.
+    A dica desfaz o erro da transcrição ("Aula" por "Olha", "nenhum porcento" por "nem 1%", "otazo" por
+    "atraso") e não esconde erro de verdade: dito "três meses", "seis em dez", "16%", "0,28", "50%", "do
+    Japão", "150 mil", "menos bagunça" ou sem o "não", com o roteiro certo como dica, o small e o turbo
+    escreveram o que foi dito. Devolve {linha: (o que ouviu, se bate com o roteiro)}; guarda em .trabalho/."""
+    duvidosas = [x for x in linhas if any(importante(d) for d in x.diferencas)
+                 and not any(d["tipo"] == "sem_fala" for d in x.diferencas)]
+    if not duvidosas or os.environ.get("HUMANIM_SEGUNDA_ESCUTA") == "0":  # 0: os testes do corte não precisam
+        return {}
+    livre = memoria_livre()
+    if nome not in _CARREGADOS and nome == PADRAO and livre is not None and livre < MEMORIA_PADRAO:
+        nome = LEVE  # transcrição guardada e pouca memória: o leve também acerta com a dica
+    arquivo = trabalho(pasta) / f"segunda-escuta-{os.path.basename(nome.rstrip('/'))}.json"
+    try:
+        guardado = json.loads(arquivo.read_text(encoding="utf-8"))
+        guardado = guardado["linhas"] if guardado.get("assinatura") == assinatura else {}
+    except (OSError, ValueError, KeyError, AttributeError):
+        guardado = {}
+
+    def chave(x):
+        return json.dumps([x.fala, x.trechos])
+
+    faltam = [x for x in duvidosas if chave(x) not in guardado]
+    if faltam:
+        modelo = carregar_whisper(nome, pasta)
+        print(f"ouvindo de novo, com o roteiro como dica, a(s) linha(s) {', '.join(str(x.numero) for x in faltam)} ...",
+              flush=True)
+        pausa = np.zeros(int(0.15 * SR), np.float32)
+        for x in faltam:
+            fala = np.concatenate([np.concatenate([audio[int(a / FPS * SR):int(b / FPS * SR)], pausa])
+                                   for a, b in x.trechos])
+            try:
+                trechos, _ = modelo.transcribe(fala, language="pt", initial_prompt=x.fala, beam_size=5,
+                                               condition_on_previous_text=False, without_timestamps=True)
+                guardado[chave(x)] = " ".join(t.text.strip() for t in trechos)
+            except Exception as e:  # noqa: BLE001 — falta de memória no meio: vira um ERRO legível
+                raise Erro(falha_do_modelo(*modelo.humanim, pasta, e)) from None
+        arquivo.write_text(json.dumps({"assinatura": assinatura, "linhas": guardado}, ensure_ascii=False),
+                           encoding="utf-8")
+    saida = {}
+    for x in duvidosas:
+        ouvido = guardado[chave(x)]
+        S, W = tokens(x.fala), [(t, bruto, True) for t, bruto, _ in tokens(ouvido)]
+        restam = []
+        for passo, i0, i1, j0, j1 in alinhar(S, W):
+            if passo == "trocada":
+                restam.append({"tipo": "trocada", "roteiro": S[i0][1], "falado": W[j0][1], "token": S[i0][0],
+                               "parecido": parecido(S[i0][0], W[j0][0])})
+            elif passo == "falta":
+                restam.append({"tipo": "faltando", "roteiro": S[i0][1], "token": S[i0][0]})
+            elif passo == "sobra" and not muleta(W[j0][0]):
+                restam.append({"tipo": "a_mais", "falado": W[j0][1], "token": W[j0][0]})
+        saida[x.numero] = (ouvido, not any(importante(d) for d in restam))
+    return saida
+
+
+def resumo(pasta, linhas, ouvidas=None):
     antes = sum(x.ate - x.de for x in linhas)
     depois = sum((b - a) / FPS for x in linhas for a, b in x.trechos)
     contagem = {}
@@ -933,24 +1276,31 @@ def resumo(pasta, linhas):
     cortes = ", ".join(f"{n} {NOMES[t][n > 1]}" for t, n in sorted(contagem.items(), key=lambda i: list(NOMES).index(i[0])))
     texto = [f"{relativo(pasta / EDICAO)}: fala de {antes:.1f}s para {depois:.1f}s ({depois - antes:+.1f}s), "
              f"{len(linhas)} linhas. Cortes: {cortes or 'nenhum'}."]
-    regravar, pequenas = [], []
+    regravar, pequenas, ouvidas = [], [], ouvidas or {}
     for x in linhas:
         dif = x.diferencas
         if any(importante(d) for d in dif):
-            regravar.append(f"  linha {x.numero}: {'; '.join(frase(d) for d in dif if importante(d))}")
+            regravar.append(f"  linha {x.numero}: {'; '.join(frase(d) for d in dif if importante(d))}"
+                            + (f' (ouvida de novo, com o roteiro como dica: "{ouvidas[x.numero][0]}")'
+                               if x.numero in ouvidas else ""))
+        elif x.numero in ouvidas:
+            pequenas.append(f"{x.numero} ({'; '.join(frase(d) for d in dif)}: ouvida de novo, com o roteiro como "
+                            f"dica, bate)")
         elif dif:
             pequenas.append(f"{x.numero} ({'; '.join(frase(d) for d in dif)})")
     if regravar:
         texto.append("A fala difere do roteiro (palavra trocada ou faltando; confira e decida se regrava):")
         texto += regravar
-        texto.append(f"Para regravar: humanim gravar {relativo(pasta / 'roteiro.md')} e depois este editar de novo. "
-                     f"Se a diferença é erro da transcrição (o áudio está certo), siga.")
+        texto.append(f"Para regravar: humanim gravar {relativo(pasta / 'roteiro.md')} (o roteiro inteiro, da linha 1: "
+                     f"uma tomada parcial não substitui a completa) e depois este editar de novo. Se a diferença é "
+                     f"erro da transcrição (o áudio está certo), siga.")
     else:
         texto.append("A fala bate com o roteiro.")
     if pequenas:
         texto.append(f"Diferenças pequenas, provavelmente da transcrição: linha {', '.join(pequenas)}.")
     texto.append(f"O que saiu e o que ficou, por linha: {relativo(pasta / EDICAO)} (cortes, diferencas).")
-    texto.append(f"Próximo: humanim animar {relativo(pasta / 'roteiro.md')} (cenas na duração da fala editada), "
-                 f"humanim tratar {relativo(pasta / 'gravacao.webm')} (em segundo plano), "
-                 f"humanim montar {relativo(pasta)}")
+    texto.append(f"Próximo, um de cada vez (cada um é pesado): humanim animar {relativo(pasta / 'roteiro.md')} "
+                 f"(cenas na duração da fala editada); depois humanim tratar {relativo(pasta / 'gravacao.webm')} "
+                 f"(minutos: em segundo plano só para não estourar o tempo limite, sozinho, e espere o OK dele); "
+                 f"só então humanim montar {relativo(pasta)}")
     return texto

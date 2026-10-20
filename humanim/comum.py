@@ -1,29 +1,56 @@
-"""Peças que todos os comandos usam: saída OK/ERRO, pastas e ffmpeg."""
+"""Peças que todos os comandos usam: saída OK/ERRO, pastas, memória e ffmpeg."""
+import hashlib
 import os
 import re
 import shlex
+import shutil
 import subprocess
 from pathlib import Path
 
+from .formato import FPS
+
 RAIZ = Path(__file__).resolve().parent.parent
+
+# A linha do tempo de tudo: t=0 é o início do arquivo da gravação (o zero do tempos.json). O webm do navegador
+# pode começar o áudio ou o vídeo depois do zero e tem quadros irregulares; estes filtros do ffmpeg trazem os
+# dois para essa linha do tempo (o áudio com silêncio no começo, o vídeo repetindo o primeiro quadro).
+AUDIO_DO_ZERO = "aresample=async=1:first_pts=0"
+VIDEO_DO_ZERO = f"fps={FPS}:start_time=0"
 
 
 class Erro(Exception):
     """Vira uma linha 'ERRO ...' na saída. A mensagem diz onde está e o que fazer."""
 
 
+_SUBCOMANDO = re.compile(r"(?<![\w./-])humanim (?=(?:novo|contar|animar|previa|gravar|editar|tratar|montar|frames)\b)")
+_EXECUTAVEL = []
+
+
+def comandos(texto):
+    """Os comandos 'humanim ...' da mensagem prontos para colar: sem o link do humanim no PATH (o
+    ./instalar.sh põe em ~/.local/bin), viram o caminho do .venv/bin/humanim."""
+    if not _EXECUTAVEL:
+        no_path = shutil.which("humanim")
+        _EXECUTAVEL.append("humanim" if no_path else shlex.quote(os.path.relpath(RAIZ / ".venv" / "bin" / "humanim")))
+    if _EXECUTAVEL[0] == "humanim":
+        return texto
+    return _SUBCOMANDO.sub(_EXECUTAVEL[0] + " ", texto)
+
+
 def ok(mensagem):
-    print(f"OK {mensagem}", flush=True)
+    print(f"OK {comandos(mensagem)}", flush=True)
 
 
 def pasta_do_video(caminho=None):
     """A pasta do vídeo: a do arquivo passado, a pasta passada, ou a pasta atual."""
     p = Path(caminho) if caminho else Path.cwd()
-    if p.suffix:
+    if p.suffix and not p.is_dir():
         p = p.parent
     p = p.resolve()
     if not (p / "roteiro.md").exists():
-        raise Erro(f"{p} não tem roteiro.md. Rode o comando dentro de videos/<slug>/ ou passe um arquivo de lá.")
+        onde = "a pasta atual" if p == Path.cwd().resolve() else relativo(p)
+        raise Erro(f"{onde} não tem roteiro.md. Passe a pasta do vídeo ou um arquivo dela, rodando da raiz "
+                   f"do humanim (ex.: videos/<slug> ou videos/<slug>/roteiro.md).")
     return p
 
 
@@ -62,3 +89,35 @@ def duracao(arquivo):
             raise Erro(f"não consegui ler a duração de {arquivo}.")
         h, m, s = tempos[-1]
         return int(h) * 3600 + int(m) * 60 + float(s)
+
+
+def contar_quadros(video):
+    """Quantos quadros de vídeo o arquivo tem (contando os pacotes, não pelo cabeçalho)."""
+    video = Path(video)
+    saida = rodar(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_packets",
+                   "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", video], f"ffprobe em {video.name}")
+    try:
+        return int(saida.strip().split(",")[0])
+    except ValueError:
+        raise Erro(f"não consegui contar os quadros de {relativo(video)} (ele tem vídeo?): "
+                   f"{saida.strip()[:100] or 'nenhuma trilha de vídeo'}") from None
+
+
+def identidade(arquivo):
+    """Identidade do conteúdo de um arquivo grande: tamanho, 1 MB do começo e 1 MB do fim. Não muda com cópia
+    nem com a data; muda se a gravação é outra. É como edicao.json e a gravação tratada sabem de quem são."""
+    tamanho, bloco = arquivo.stat().st_size, 1 << 20
+    with open(arquivo, "rb") as f:
+        inicio = f.read(bloco)
+        f.seek(max(0, tamanho - bloco))
+        fim = f.read(bloco)
+    return hashlib.sha256(str(tamanho).encode() + inicio + fim).hexdigest()[:16]
+
+
+def memoria_livre():
+    """GB de memória disponível (MemAvailable, o 'disponível' do free), ou None fora do Linux."""
+    try:
+        with open("/proc/meminfo") as f:
+            return next(int(x.split()[1]) / 2 ** 20 for x in f if x.startswith("MemAvailable:"))
+    except (OSError, StopIteration, ValueError):
+        return None

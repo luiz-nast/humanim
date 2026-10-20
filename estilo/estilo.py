@@ -8,8 +8,8 @@ import re
 from manim import *  # noqa: F401,F403
 from manim import config, np
 
-from humanim.formato import ALTURA, CANTO, FPS, LARGURA
-from humanim.roteiro import ritmo
+from humanim.formato import ALTURA, CANTO, FAIXA_TOPO, FPS, LARGURA
+from humanim.roteiro import fracao_na_fala
 
 # Tela em pé com 8 unidades de largura: 135 px por unidade, a mesma escala de um
 # vídeo 1080p do Manim, então tamanhos de fonte e espessuras ficam com a cara de sempre.
@@ -43,9 +43,24 @@ MarkupText.set_default(font=FONTE)
 DecimalNumber.set_default(mob_class=Text)
 NumberLine.set_default(label_constructor=Text)
 BarChart.set_default(bar_colors=[AZUL, VERDE, AMARELO, LARANJA, ROXO])  # o padrão do Manim some no preto
-# E no formato brasileiro: 1.234,5.
+# E no formato brasileiro: 1.234,5, com o sinal de menos da Lato (o hífen é curto e fica baixo).
+MENOS = "−"  # U+2212
 _formatar = DecimalNumber._get_num_string
 DecimalNumber._get_num_string = lambda self, n: _formatar(self, n).translate(str.maketrans(",.", ".,"))
+_peca = DecimalNumber._string_to_mob  # o Manim centra na altura o caractere "-": a string guarda o "-", o desenho é o "−"
+DecimalNumber._string_to_mob = lambda self, s, mob_class=None, **kw: _peca(self, MENOS if s == "-" else s, mob_class, **kw)
+
+
+def br(x, casas=0, sinal=False):
+    """Número escrito como o DecimalNumber escreve, para Text e contas: br(1295.2) "1.295", br(-55.18, 1) "−55,2",
+    br(0.3445, 2) "0,34". sinal=True põe "+" nos positivos. Nunca "−0"."""
+    s = f"{x:,.{casas}f}"
+    zero = not any(c in "123456789" for c in s)
+    if zero and s.startswith("-"):
+        s = s[1:]
+    if sinal and not zero and not s.startswith("-"):
+        s = "+" + s
+    return s.translate(str.maketrans(",.-", ".," + MENOS))
 
 
 def pixel(x, y):
@@ -55,14 +70,14 @@ def pixel(x, y):
 
 # Zona segura: fora dela a interface do app (topo, legenda e botões embaixo) cobre a imagem.
 LADO = pixel(LARGURA - 64, 0)[0]  # 3.53: x vai de -LADO a LADO
-TOPO = pixel(0, 200)[1]  # 5.63
+TOPO = pixel(0, FAIXA_TOPO)[1]  # 5.63
 BASE = pixel(0, 1600)[1]  # -4.74
 
 # Onde você fica nas linhas [CANTO], em unidades Manim (formato.CANTO convertido).
-CANTO_ESQ, CANTO_TOPO = pixel(CANTO[0], CANTO[1])[:2]  # -3.64, -1.19
-CANTO_DIR, CANTO_BASE = pixel(CANTO[0] + CANTO[2], CANTO[1] + CANTO[3])[:2]  # -0.98, -4.74
+CANTO_ESQ, CANTO_TOPO = pixel(CANTO[0], CANTO[1])[:2]  # -4.0, -2.37
+CANTO_DIR, CANTO_BASE = pixel(CANTO[0] + CANTO[2], CANTO[1] + CANTO[3])[:2]  # -0.44, -7.11
 
-# Área para desenhar (esq, base, dir, topo). Em [CANTO], só acima de você.
+# Área para desenhar (esq, base, dir, topo). Em [CANTO], só acima de você (y > -2.07).
 AREA = (-LADO, BASE, LADO, TOPO)
 AREA_CANTO = (-LADO, CANTO_TOPO + 0.3, LADO, TOPO)
 
@@ -75,10 +90,54 @@ def zona_canto():
 
 
 def rotulo(texto, cor=BRANCO, tamanho=ROTULO, **kwargs):
-    """Texto curto na fonte do estilo. Mais de 3 palavras vira erro: na tela, só rótulo."""
-    if len(re.findall(r"\w+", texto)) > 3:
-        raise ValueError(f'rótulo "{texto}" tem mais de 3 palavras: na tela vai só rótulo curto, a frase fica na fala.')
+    """Texto curto na fonte do estilo. Mais de 3 palavras vira erro: na tela, só rótulo. Número ("1.295") é uma."""
+    if len(re.findall(r"\d+(?:[.,]\d+)*|\w+", texto)) > 3:
+        raise ValueError(f'rótulo "{texto}" tem mais de 3 palavras: na tela vai só rótulo curto, a frase fica na fala '
+                         f'(conta ou fórmula: conta(...)).')
     return Text(texto, color=cor, font_size=tamanho, **kwargs)
+
+
+FINO = " "  # espaço fino: entre um "²" e um ")" de uma conta, para o expoente não encostar
+
+
+def conta(*partes, tamanho=ROTULO, cor=BRANCO, cores=None):
+    """Conta ou fórmula num Text só, com cada parte acessível para animar sozinha:
+    conta("0", " − ", "10", " × ", "(−55,2)", " = ", "552")[2] é o "10". Tudo fica na mesma linha de base (Text
+    separados com arrange desalinham), os espaços vão dentro das partes, e a regra das 3 palavras não vale aqui.
+    O hífen antes de número ou sozinho vira o menos (−); "²" e "³" saem 25% maiores, para se ler no celular (antes
+    de um ")", ponha FINO). cores: {índice da parte: cor}."""
+    partes = [re.sub(r"(?<!\w)-(?=[\d\s(]|$)", MENOS, p) for p in partes]
+    s = "".join(partes)
+    t = Text(s, font_size=tamanho, color=cor, disable_ligatures=True)
+    if len(t.submobjects) != len(s):
+        raise ValueError(f"conta {s!r}: {len(t.submobjects)} glifos para {len(s)} caracteres (quebra de linha?)")
+    for i, c in enumerate(s):
+        if c in "²³":
+            t.submobjects[i].scale(1.25, about_edge=DL)
+    grupos, i = VGroup(), 0
+    for k, p in enumerate(partes):
+        g = VGroup(*(m for m in t.submobjects[i:i + len(p)] if m.has_points()))  # sem os espaços: o Write quebra neles
+        if cores and k in cores:
+            g.set_color(cores[k])
+        grupos.add(g)
+        i += len(p)
+    return grupos
+
+
+def lupa(ponto, centro, raio=1.1, raio_alvo=0.25, cor=CINZA):
+    """Ampliar um detalhe sem enganar: um círculo no detalhe, ligado por duas linhas a um círculo maior (a lente,
+    com fundo preto, cobre o que fica atrás). O detalhe ampliado a cena desenha dentro da lente (centro, raio).
+    Devolve VGroup(alvo, linha, linha, lente). Se uma linha cair em cima de algo, mude o centro da lente."""
+    p, c = np.array(ponto, dtype=float), np.array(centro, dtype=float)
+    d = np.linalg.norm(c - p)
+    if d <= raio + raio_alvo:
+        raise ValueError("lupa: a lente encosta no detalhe; afaste o centro ou diminua o raio.")
+    u, angulo = (c - p) / d, np.arccos((raio_alvo - raio) / d)  # tangentes externas aos dois círculos
+    linhas = [Line(p + raio_alvo * n, c + raio * n, color=cor, stroke_width=3)
+              for n in (rotate_vector(u, angulo), rotate_vector(u, -angulo))]
+    alvo = Circle(radius=raio_alvo, color=cor, stroke_width=3).move_to(p)
+    lente = Circle(radius=raio, color=cor, stroke_width=4).move_to(c).set_fill(FUNDO, opacity=1)
+    return VGroup(alvo, *linhas, lente)
 
 
 class CenaHumanim(Scene):
@@ -129,13 +188,10 @@ class CenaHumanim(Scene):
         A posição da palavra sai do ritmo estimado da fala (sílabas, números por extenso e pausas da
         pontuação), esticado ou encolhido para a duração da linha."""
         if isinstance(quando, str):
-            todas = re.findall(r"\w+", self.fala.lower())
-            busca = re.findall(r"\w+", quando.lower())
-            achou = [i for i in range(len(todas)) if todas[i:i + len(busca)] == busca]
-            if len(achou) < vez:
+            fracao = fracao_na_fala(self.fala, quando, vez)
+            if fracao is None:
                 raise ValueError(f'"{quando}" (vez {vez}) não está na fala: "{self.fala}"')
-            inicios, total = ritmo(self.fala)
-            quando = inicios[achou[vez - 1]] / total if total > 0 else achou[vez - 1] / len(todas)
+            quando = fracao
         return quando * self.duracao
 
     def ate(self, quando, vez=1):

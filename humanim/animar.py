@@ -9,12 +9,17 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from .comum import RAIZ, Erro, ok, pasta_do_video, relativo, rodar, trabalho
+from .comum import RAIZ, Erro, contar_quadros, memoria_livre, ok, pasta_do_video, relativo, rodar, trabalho
 from .formato import ALTURA, FPS, LARGURA
 from .roteiro import EDICAO, ler_roteiro, ler_tempos, quadros
 
 ESTILO = RAIZ / "estilo"
-PARALELO = int(os.environ.get("HUMANIM_PARALELO", 3))
+# O que toda cena roda além dela e do comum.py: o estilo, o formato (o canto, a faixa de cima) e o ritmo da
+# fala (fala.py: quando cada palavra é dita, que o self.momento usa). Mudou, o clipe muda.
+DEPENDENCIAS = (ESTILO / "estilo.py", RAIZ / "humanim" / "formato.py", RAIZ / "humanim" / "fala.py")
+# Renders ao mesmo tempo: HUMANIM_PARALELO, ou o que a memória livre deixa (cada render de 1080x1920 passa de
+# 700 MB; fica 1,5 GB de folga para o resto da máquina), de 1 a 3.
+POR_RENDER, FOLGA, MAXIMO = 0.8, 1.5, 3
 PARADA = 1.5  # segundos de imagem parada que já pedem aviso ("algo muda a cada segundo")
 # Roda o manim com traceback comum do Python (o padrão é uma caixa do rich, difícil de ler).
 MANIM = ("import sys, traceback, manim; "
@@ -22,22 +27,61 @@ MANIM = ("import sys, traceback, manim; "
          "from manim.__main__ import main; main()")
 
 
-def contar_quadros(video):
-    saida = rodar(["ffprobe", "-v", "error", "-select_streams", "v:0", "-count_packets",
-                   "-show_entries", "stream=nb_read_packets", "-of", "csv=p=0", video], f"ffprobe em {video.name}")
-    try:
-        return int(saida.strip().split(",")[0])
-    except ValueError:
-        raise Erro(f"não consegui contar os quadros de {video.name}: {saida.strip()[:100]}")
+def paralelo():
+    """(quantos renders ao mesmo tempo, por quê): HUMANIM_PARALELO ou pela memória livre."""
+    if os.environ.get("HUMANIM_PARALELO"):
+        try:
+            return max(1, int(os.environ["HUMANIM_PARALELO"])), "HUMANIM_PARALELO"
+        except ValueError:
+            raise Erro(f"HUMANIM_PARALELO={os.environ['HUMANIM_PARALELO']} não é um número: use 1, 2 ou 3 "
+                       f"(ou tire a variável, e o animar escolhe pela memória livre).") from None
+    livre = memoria_livre()
+    if livre is None:
+        return MAXIMO, ""
+    n = max(1, min(MAXIMO, int((livre - FOLGA) / POR_RENDER)))
+    return n, f"{livre:.1f} GB de memória livre"
 
 
 def assinatura(cena, linha):
-    """Muda quando muda algo que altera o clipe: a cena, cenas/comum.py, o estilo, a marca ou a fala."""
+    """Muda quando muda algo que altera o clipe: a cena, cenas/comum.py, as DEPENDENCIAS, a marca ou a fala."""
     h = hashlib.sha256()
-    for arq in (ESTILO / "estilo.py", cena.parent / "comum.py", cena):
+    for arq in (*DEPENDENCIAS, cena.parent / "comum.py", cena):
         h.update(arq.read_bytes() if arq.exists() else b"-")
     h.update(f"{linha.marca}|{linha.fala}|{os.environ.get('HUMANIM_DEPURAR', '')}".encode())
     return h.hexdigest()[:16]
+
+
+def ler_feitas(pasta):
+    """O cenas/render.json: o que o último animar fez de cada cena ({cena: {hash, quadros}})."""
+    arquivo = pasta / "cenas" / "render.json"
+    try:
+        return json.loads(arquivo.read_text(encoding="utf-8")) if arquivo.exists() else {}
+    except ValueError:
+        return {}
+
+
+def motivo_da_cena(pasta, linha, pede, feitas):
+    """'' se cenas/linha_NN.mp4 é o que o último animar fez da cena atual, com os `pede` quadros da fala;
+    senão, o motivo. É a mesma pergunta para a prévia (que avisa) e para o montar (que recusa)."""
+    cena, clipe = pasta / "cenas" / f"{linha.cena}.py", pasta / "cenas" / f"{linha.cena}.mp4"
+    if not clipe.exists():
+        falta = "" if cena.exists() else f" e a própria cena cenas/{linha.cena}.py: escreva-a com a skill cenas"
+        return f"falta cenas/{linha.cena}.mp4{falta}"
+    if abs((tem := contar_quadros(clipe)) - pede) > 1:
+        return f"a animação está desatualizada ({tem} quadros, a fala pede {pede})"
+    if not cena.exists() or feitas.get(linha.cena) != {"hash": assinatura(cena, linha), "quadros": pede}:
+        return ("o clipe não é da cena atual: a cena, o comum.py, o estilo, o formato, o ritmo da fala ou a fala "
+                "mudaram depois do último animar, ele falhou nesta linha, ou ela saiu com HUMANIM_DEPURAR")
+    return ""
+
+
+def por_motivo(problemas):
+    """[(linha, motivo)] em texto, uma linha por motivo: 'linhas 1, 2 e 4: o motivo'."""
+    juntos = {}
+    for n, motivo in problemas:
+        juntos.setdefault(motivo, []).append(str(n))
+    return "\n".join(f"linha{'s' if len(ns) > 1 else ''} {', '.join(ns[:-1]) + ' e ' if len(ns) > 1 else ''}{ns[-1]}: "
+                     f"{motivo}." for motivo, ns in juntos.items())
 
 
 def paradas(video):
@@ -138,9 +182,10 @@ def main(args):
 
     (pasta / "cenas").mkdir(exist_ok=True)
     arquivo = pasta / "cenas" / "render.json"
-    cache = json.loads(arquivo.read_text(encoding="utf-8")) if arquivo.exists() else {}
+    cache = ler_feitas(pasta)
     falhas, renderizadas = [], 0
-    ex = ThreadPoolExecutor(PARALELO)
+    por_vez, motivo = paralelo()
+    ex = ThreadPoolExecutor(por_vez)
     tarefas = {linha.cena: ex.submit(animar_linha, pasta, linha, alvos[linha.numero], cache.get(linha.cena))
                for linha in escolhidas}
     try:
@@ -174,6 +219,8 @@ def main(args):
                   f"{relativo(pasta / 'gravacao.webm')} e animar de novo)")
     if os.environ.get("HUMANIM_DEPURAR"):
         origem += "; COM a zona segura e a do canto desenhadas: rode sem HUMANIM_DEPURAR antes de montar"
+    if renderizadas or falhas:
+        origem += f"; {min(por_vez, len(escolhidas))} render(s) por vez" + (f" ({motivo})" if motivo else "")
     if falhas:
         pedir = " ".join(f"--linha {n}" for n in falhas)
         raise Erro(f"{len(falhas)} de {len(escolhidas)} cena(s) falharam, linha(s) {falhas}, com {origem}. "

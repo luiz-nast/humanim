@@ -1,6 +1,6 @@
 ---
 name: roteiro
-description: Escreve e ajusta roteiros dos shorts do humanim (vídeos verticais de 60 a 90 s que quebram uma teoria pesada de IA, com dados reais), linha por linha, com as marcas [CARA], [ANIM: …] e [CANTO: …]. Use quando pedirem um roteiro, um vídeo novo sobre um tema, ideias de vídeo, ou ajustes num videos/<slug>/roteiro.md.
+description: Escreve e ajusta roteiros dos shorts do humanim (vídeos verticais de 60 a 90 s que quebram uma teoria pesada de IA, com dados reais), linha por linha, com as marcas [CARA], [ANIM: …] e [CANTO: …]. Use quando pedirem só o roteiro (ou o roteirista do diretor pedir), ideias de vídeo, ou ajustes num videos/<slug>/roteiro.md. Um vídeo novo do começo ao fim ("faz um vídeo sobre X") é da skill diretor, que faz a pesquisa e chama esta.
 ---
 
 # Roteiro
@@ -12,11 +12,11 @@ Escreve o roteiro de um short do humanim: o que quem apresenta fala e o que apar
 1. Leia `voz.md` e `temas.md`, nesta pasta.
 2. Se `voz.md` ainda não tem frases de exemplo, siga só o Tom e os fechamentos que estão lá, e avise na entrega.
 3. Feche o tema numa frase: o único conceito pesado que o vídeo quebra. Tema largo ("árvores de decisão") vira um mecanismo ("como a árvore escolhe a pergunta: impureza de Gini"). Sem mecanismo, vira fluxograma.
-4. Tenha o material antes de escrever: as fontes do conceito (artigo, livro, documentação) e um dataset público real ou caso real documentado, com os números calculados por um script em `videos/<slug>/dados/`. Fontes com URL em `videos/<slug>/fontes.md`. Nenhum número entra no roteiro sem sair de lá.
+4. Tenha o material antes de escrever: as fontes do conceito (artigo, livro, documentação) e um dataset público real ou caso real documentado, com os números calculados por um script em `videos/<slug>/dados/`. Fontes com URL em `videos/<slug>/fontes.md`. Nenhum número entra no roteiro sem sair de lá. Leia o `teoria.md` (as seções "O caminho que cabe em 60 a 90 s" e "Armadilhas", com o "ERRADO, não diga") e o bloco `para_tela` de `dados/resultados.json`: os números como a tela mostra e a intuição de cada um em palavras, pronta para a fala. Se a pasta ainda não tem `teoria.md` e `dados/resultados.json`, faça a pesquisa antes, como diz a skill `diretor` (passo 2), em vez de escrever sem ela.
 
 ## O arquivo
 
-Salve em `videos/<slug>/roteiro.md`. O slug é o tema curto em minúsculas, sem acento, com hífens: `arvore-de-decisao`. Crie a pasta se não existir.
+Salve em `videos/<slug>/roteiro.md`. O slug é o tema curto em minúsculas, sem acento, com hífens: `arvore-de-decisao`. A pasta sai do `humanim novo <slug>`.
 
 O arquivo tem só as linhas do roteiro: uma fala por linha, sem título, sem comentário, sem linha em branco no meio, terminando com uma quebra de linha. A linha N do arquivo é a `"linha": N` do `tempos.json` que o teleprompter vai gerar, então nada além das falas entra ali. Observações vão no chat.
 
@@ -28,9 +28,7 @@ Cada linha começa com uma das três marcas, escritas exatamente assim:
 | `[ANIM: o que aparece] fala` | só a animação |
 | `[CANTO: o que aparece] fala` | a animação, com quem apresenta no canto inferior esquerdo, encostado nas bordas |
 
-As marcas são escritas sempre, mesmo enquanto a gravação for só com a cara: são elas que guiam as animações e a montagem depois.
-
-Exemplo de formato (só o formato; o conteúdo de um vídeo de verdade vai bem mais fundo, e o vídeo inteiro tem 14 a 22 linhas):
+Exemplo de formato (só o formato; um vídeo de verdade vai bem mais fundo):
 
 ```
 [CARA] Sabe como o banco decide se te dá crédito?
@@ -42,17 +40,18 @@ Exemplo de formato (só o formato; o conteúdo de um vídeo de verdade vai bem m
 
 ## Regras do canal
 
-1. **Teoria pesada, quebrada de verdade.** O vídeo mostra o mecanismo: a regra, a conta, o algoritmo, passo a passo. O termo técnico entra com o nome certo, depois da intuição ("isso tem nome: impureza de Gini"). Simplificar pode; simplificar errado, nunca.
+1. **Teoria pesada, quebrada de verdade.** O vídeo mostra o mecanismo: a regra, a conta, o algoritmo, passo a passo. O termo técnico entra com o nome certo, depois da intuição ("isso tem nome: impureza de Gini"). Palavra comum com sentido técnico (taxa, peso, perda) também espera a intuição, e a tela segue a mesma ordem (rótulo provisório, como "escolhido", até a fala dar o nome). Nome dito uma vez só fica só na tela. Simplificar pode; simplificar errado, nunca.
 2. **Dados reais, nada de brinquedo.** O exemplo vem de um dataset público real ou de um caso real documentado, e os números na fala e na tela são os calculados de verdade (com a fonte em `fontes.md`). "Um banco pode…" com números inventados não serve.
 3. **Nexo.** Cada linha sai da anterior: gancho real → a pergunta → intuição → mecanismo passo a passo → a conta nos dados reais → consequência ou limite → fechamento. Teste de cada linha: tirá-la quebra a lógica? Se não quebra, corte.
-4. **60 a 90 segundos, um conceito.** Alvo de 150 a 200 palavras faladas, teto de 220; isso dá 14 a 22 linhas. Melhor um conceito inteiro com calma do que três pela metade: a conta precisa de tempo na tela. Conta como palavra tudo que tem letra ou número, sem contar as marcas.
-5. **A primeira linha é um gancho:** um fato real que surpreende ou uma pergunta concreta. Nada de "Olá, hoje vamos falar de…".
-6. **Frases curtas, para ler em voz alta.** Uma ideia por linha, 5 a 20 palavras. Leia mentalmente em voz alta: se tropeça, reescreva.
+4. **60 a 90 segundos, um conceito**, em 14 a 22 linhas. Quem mede é o `humanim contar videos/<slug>/roteiro.md`: ele conta sílabas, com os números por extenso ("1.295" leva 2 s), e é o mesmo ritmo da prévia e das cenas. Melhor um conceito inteiro com calma do que três pela metade: a conta precisa de tempo na tela.
+5. **A primeira linha é um gancho:** um fato real que surpreende ou uma pergunta concreta, com a palavra que surpreende nas primeiras 5 ou 6 palavras (uns 2 s). Nada de "Olá, hoje vamos falar de…".
+6. **Frases curtas, para ler em voz alta.** Uma ideia por linha, 5 a 20 palavras. Leia mentalmente em voz alta: se tropeça, reescreva. Escreva o que se diz: "menos", "vezes", "dá", e o nome da coisa ("o preço do metro"), não a letra da fórmula (w); símbolo fica na descrição da tela. A edição compara a fala gravada com este texto.
 7. **Toda linha começa com uma marca.**
 8. **As marcas se alternam.** Nunca três linhas seguidas com a mesma marca. Quem apresenta não fica muito tempo sumido (`[ANIM]`) nem muito tempo parado na tela (`[CARA]`). Entre a primeira e as duas últimas linhas, `[CARA]` aparece em uma linha por vez.
 9. **Termina com uma linha `[CARA]` de fechamento**, tirada de `voz.md`. A conclusão do vídeo pode vir logo antes, também em `[CARA]`.
 10. **Fala do jeito de quem apresenta**, seguindo `voz.md`. Na dúvida entre uma palavra bonita e uma comum, fica a comum.
-11. **Fatos certos.** Nome, data e número só entram com certeza. Assunto disputado (ex.: "pai do deep learning" tem mais de um candidato) vira parte da história, em vez de escolher um lado. Número do dataset sai do script, com as casas que o script dá (arredonde na fala, não na conta).
+11. **Fatos certos.** Nome, data e número só entram com certeza. Assunto disputado (ex.: "pai do deep learning" tem mais de um candidato) vira parte da história, em vez de escolher um lado. Número do dataset sai do script. Número que não entra numa conta pode ser arredondado na fala ("quase 1.300"), com o exato na tela; numa conta que quem assiste refaz, fala e tela usam os números do `para_tela`, e numa conta encadeada cada passo parte do número mostrado no anterior.
+12. **Uma grandeza, um nome.** Se a tela mostra duas medidas da mesma coisa (a perda e o erro típico, que é a raiz dela), a fala ou um rótulo diz a relação, e o número ao lado de uma curva é o dessa curva. Cuidado com "em média": raiz da média dos quadrados não é média.
 
 ## O que vai dentro de `[ANIM: …]` e `[CANTO: …]`
 
@@ -60,38 +59,40 @@ A descrição é o pedido para a cena Manim daquela linha, então ela diz o que 
 
 - Só o que o Manim desenha bem sobre fundo preto: formas, setas, números, gráficos, linhas do tempo, e a conta montada passo a passo (termo a termo, com os números reais).
 - Ritmo de Reels, não de slide: texto na tela só como rótulo curto (até 3 palavras, num nó, eixo ou destaque). Frase ou lista de tópicos, nunca.
-- A imagem acompanha a fala daquela linha. Se a fala diz "aprovado", é ali que "aprovado" acende.
+- A imagem acompanha a fala daquela linha. Se a fala diz "aprovado", é ali que "aprovado" acende: escreva `em "aprovado"`. `em "…"` é só para gatilho, com a palavra exata da fala; o valor mostrado vai sem "em" antes das aspas.
+- Cada evento precisa de tempo para acontecer e ser visto: uns 1 s cada, e o último ao menos 0,7 s antes do fim da fala. O `humanim contar` mostra o segundo de cada gatilho e avisa. Não cabe? Alongue a fala, corte eventos ou divida a linha.
+- Comparação tem de se ver: escolha nos dados um par com diferença visível (o dobro, não 13%) ou peça os dois números lado a lado.
 - Sem colchetes dentro da descrição nem da fala: o primeiro `]` fecha a marca. Use parênteses ou aspas (`[ANIM: o vetor (0, 1, 0) acende]`).
 - Linhas seguidas podem continuar a mesma cena ("o caminho até 'aprovado' acende" continua a árvore de antes).
-- Em `[CANTO]`, a cena deixa livre o canto inferior esquerdo, onde quem apresenta fica.
+- `[CANTO]` pede descrição curta: um elemento principal, pouco movimento, nada no canto inferior esquerdo, onde quem apresenta fica. A `[ANIM]` que continua numa `[CANTO]` termina com tudo acima do canto. Para dividir uma `[ANIM]` longa sem três `[ANIM]` seguidas, a metade que continua vira `[CANTO]`, com a cena acima do canto.
+- Posições ("no alto à direita") são indicação: quem anima muda para caber, sem mudar o sentido.
 - Precisa de foto (ex.: o rosto de um pesquisador)? Escreva `foto: …` na descrição e avise no chat. Quem apresenta decide.
 
 ## Entrega
 
 Antes de entregar, confira cada item:
 
-- [ ] Um conceito só, quebrado até o mecanismo, e o gancho na linha 1
+- [ ] Um conceito só, quebrado até o mecanismo, e o gancho na linha 1, nos primeiros 2 s
 - [ ] Todo número sai de `dados/` e toda afirmação tem fonte em `fontes.md`
 - [ ] Nexo: nenhuma linha sobra
-- [ ] 150 a 200 palavras faladas, nunca mais que 220
-- [ ] Toda linha com marca, nenhuma marca três vezes seguidas
-- [ ] Todo termo técnico entra depois da intuição, com o nome certo
-- [ ] Última linha `[CARA]` de fechamento
+- [ ] `humanim contar` dá 60 a 90 s e nenhum aviso (gatilho fora da fala, evento no fim da linha, marca três vezes seguidas)
+- [ ] Todo termo técnico entra depois da intuição, com o nome certo; uma grandeza, um nome
+- [ ] O Tom do `voz.md`: fala com "você" em alguma linha, e a última é o `[CARA]` de fechamento
 - [ ] Arquivo só com as linhas, sem linha em branco no meio
 
-Depois de salvar, marque o tema em `temas.md`: troque `- [ ]` por `- [x]`. Tema que não está lá, ou está em Sugestões, entra em Ideias já marcado, com o slug.
+Depois de salvar, marque o tema em `temas.md`: troque `- [ ]` por `- [x]`. Tema que não está lá, ou está em Sugestões, entra em Ideias já marcado, com o slug. Pasta de ensaio (`teste-*`) não entra.
 
 No chat, nesta ordem:
 
 1. Se `voz.md` não tinha frases de exemplo: o aviso, pedindo 3 a 5 frases do jeito que quem apresenta fala.
 2. A ideia do vídeo, numa frase.
-3. O caminho do arquivo, o número de linhas, a contagem de palavras, a duração estimada (palavras ÷ 2,5 = segundos), o dataset e as fontes.
+3. O caminho do arquivo, o número de linhas, a duração do `humanim contar`, o dataset e as fontes.
 4. O que vale conferir antes de gravar, se houver: afirmações, simplificações, pedidos de foto.
-5. Se o comando `humanim gravar` ainda não existe: as falas sem as marcas, num único bloco de código, uma fala por linha, prontas para colar no app de teleprompter do celular.
 
 ## Ajustes
 
 - "Ajusta a linha 3 de videos/arvore-de-decisao": mude só a linha 3 daquela pasta e mostre como ficou.
+- Revisão com as críticas, quando nem tudo cabe: primeiro o erro de fato e de mecanismo, depois o que muda só a descrição (sai de graça), por fim voz e público. Cada segundo a mais se paga com um corte, medido no `humanim contar`.
 - Se a pasta já tem `tempos.json` ou `gravacao.webm`, avise antes de incluir, tirar ou trocar linhas de lugar, ou de mudar o texto de uma fala: os tempos gravados deixam de bater (ou o áudio fica com o texto antigo) e a gravação precisa ser refeita. Mudar só a descrição de [ANIM] ou [CANTO] não pede gravação nova.
 - Quando quem apresenta reescrever uma fala com as próprias palavras, ofereça guardar a frase em `voz.md`. É assim que a skill fica mais parecida com quem apresenta a cada vídeo.
 
