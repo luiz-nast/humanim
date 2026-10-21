@@ -45,7 +45,7 @@ Cada linha do roteiro é uma frase que você fala. Uma marca no começo diz o qu
 
 | Marca | O que aparece na tela |
 | --- | --- |
-| `[CARA]` | Você, em tela cheia. |
+| `[CARA]` | Você, em tela cheia, com a animação de antes parada e desfocada atrás. |
 | `[ANIM]` | Só a animação, com a sua voz por baixo. |
 | `[CANTO]` | A animação, com você no canto de baixo à esquerda, sempre encostado na borda. |
 
@@ -82,9 +82,9 @@ Montar a ferramenta deu trabalho uma vez só. Para cada vídeo novo, as estimati
 
 | Parte | Tempo da máquina | O seu tempo |
 | --- | --- | --- |
-| Do pedido à prévia | meta de 1h30 (o primeiro vídeo levou umas 4 h; o processo foi ajustado para fazer mais coisas ao mesmo tempo) | assistir e aprovar |
+| Do pedido à prévia | o primeiro vídeo levou umas 4 h, o segundo (KNN) 1h22; a meta é o vídeo inteiro, até o fim, em uns 40 a 50 min | assistir e aprovar |
 | Gravação | — | uns 2 a 5 min |
-| Da gravação ao vídeo pronto | uns 15 min para 2 min de gravação | nada |
+| Da gravação ao vídeo pronto | uns 10 min para 2 min de gravação (tirar o cenário só do que aparece na tela leva uns 2 min) | nada |
 | Publicação | — | postar |
 
 São medições feitas com uma gravação de teste. A primeira gravação de verdade vai confirmar os números.

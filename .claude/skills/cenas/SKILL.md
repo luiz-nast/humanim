@@ -12,6 +12,7 @@ Cada linha `[ANIM: …]` ou `[CANTO: …]` do `roteiro.md` vira uma cena Manim q
 1. Leia o `roteiro.md` inteiro e marque quais linhas seguidas continuam a mesma cena (ex.: a árvore da linha 2 segue na 3 e na 4). Essas compartilham objetos em `cenas/comum.py`.
 2. Leia `estilo/estilo.py`: é a identidade visual. Cor, fonte e tamanho saem só de lá.
 3. Se já existe `cenas/comum.py` ou cenas de outras linhas, leia antes de mexer: mudar o `comum.py` muda todas as linhas que o usam.
+4. Arquivo grande (o `comum.py`, uma cena longa) sai em partes: o esqueleto num Write, depois uma parte por Edit, umas 150 linhas cada. Uma resposta que escreve o arquivo inteiro de uma vez pode cair no meio e perder tudo; em partes, o que já foi salvo fica. Se você está recomeçando um trabalho, leia o que já está no disco e continue dali.
 
 ## O arquivo
 

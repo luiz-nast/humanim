@@ -16,6 +16,21 @@ RAIZ = Path(__file__).resolve().parent.parent
 # dois para essa linha do tempo (o áudio com silêncio no começo, o vídeo repetindo o primeiro quadro).
 AUDIO_DO_ZERO = "aresample=async=1:first_pts=0"
 VIDEO_DO_ZERO = f"fps={FPS}:start_time=0"
+# A parte da gravação que a montagem usa: o miolo 3:4 (540x720 numa webcam de 1280x720). O [CARA] e o [CANTO]
+# recortam dele; o tratar só tira o fundo dele.
+MIOLO_3X4 = "crop='trunc(min(iw,ih*3/4)/2)*2':'trunc(min(ih,iw*4/3)/2)*2'"
+
+
+def fundo_do_cara(escala=1.0):
+    """Filtro do ffmpeg para o que fica atrás de você no [CARA] sem fundo: o quadro da animação vizinha,
+    desfocado e escurecido, para o vídeo não virar um buraco preto e o rosto continuar na frente.
+    `escala`: o tamanho do quadro em relação ao vídeo final (a prévia sai em meio tamanho)."""
+    return f"gblur=sigma={24 * escala:g},eq=brightness=-0.06:saturation=0.85"
+
+
+def miolo_3x4(w, h):
+    """Largura e altura do MIOLO_3X4 numa gravação w x h (a mesma conta do filtro)."""
+    return int(min(w, h * 3 / 4) / 2) * 2, int(min(h, w * 4 / 3) / 2) * 2
 
 
 class Erro(Exception):

@@ -171,6 +171,16 @@ def ler_edicao(pasta, tempos):
     return editados
 
 
+def vizinha_animada(linhas, i):
+    """A animação que fica atrás de você na linha [CARA] linhas[i]: (a última linha animada antes dela, "fim"),
+    ou, se não tem nenhuma antes, (a primeira depois, "inicio"); None se o roteiro não tem animação."""
+    antes = [x for x in linhas[:i] if x.tem_animacao]
+    if antes:
+        return antes[-1], "fim"
+    depois = [x for x in linhas[i + 1:] if x.tem_animacao]
+    return (depois[0], "inicio") if depois else None
+
+
 def quadros(tempos):
     """Quantos quadros cada linha ocupa no vídeo final, na ordem do roteiro.
 

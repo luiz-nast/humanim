@@ -10,11 +10,11 @@ from dataclasses import dataclass
 import numpy as np
 
 from .animar import ler_feitas, motivo_da_cena, por_motivo
-from .comum import (AUDIO_DO_ZERO, VIDEO_DO_ZERO, Erro, contar_quadros, duracao, identidade, ok, pasta_do_video,
-                    relativo, rodar, trabalho)
+from .comum import (AUDIO_DO_ZERO, MIOLO_3X4, VIDEO_DO_ZERO, Erro, contar_quadros, duracao, fundo_do_cara, identidade,
+                    ok, pasta_do_video, relativo, rodar, trabalho)
 from .formato import ALTURA, CANTO, FAIXA_TOPO, FPS, LARGURA, ZOOM, lados_soltos
-from .roteiro import EDICAO, ler_roteiro, ler_tempos, quadros
-from .tratar import fonte_da_tratada, tratar_rodando
+from .roteiro import EDICAO, ler_roteiro, ler_tempos, quadros, vizinha_animada
+from .tratar import cobertura, descobertos, fonte_da_tratada, tratar_rodando
 
 BORDA = 4  # contorno claro nos lados do [CANTO] que não encostam na tela, quando a gravação tem fundo
 X264 = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(FPS)]
@@ -47,8 +47,9 @@ def conferir_cenas(pasta, linhas, contagens):
         raise Erro(f"{texto}\nRode humanim animar {relativo(pasta / 'roteiro.md')} {opcoes}")
 
 
-def escolher_gravacao(pasta):
-    """A gravação tratada (sem fundo) se ela for desta gravacao.webm; senão a original."""
+def escolher_gravacao(pasta, precisa):
+    """A gravação tratada (sem fundo) se ela for desta gravacao.webm; senão a original. `precisa`: os
+    intervalos de quadros em que você aparece, que a tratada tem de ter tratado."""
     original, tratada = pasta / "gravacao.webm", pasta / "gravacao-tratada.webm"
     if not original.exists():
         raise Erro(f"falta gravacao.webm em {pasta}. Grave primeiro: humanim gravar {relativo(pasta / 'roteiro.md')}")
@@ -57,6 +58,12 @@ def escolher_gravacao(pasta):
                    f"e são dois processos pesados ao mesmo tempo. Espere o OK dele e rode de novo: "
                    f"humanim montar {relativo(pasta)}")
     if tratada.exists() and fonte_da_tratada(tratada) == identidade(original):
+        if faltam := descobertos(cobertura(tratada), precisa):
+            a, b = faltam[0]
+            raise Erro(f"gravacao-tratada.webm não tem o fundo tirado de {len(faltam)} trecho(s) em que você aparece "
+                       f"(o primeiro, de {a / FPS:.1f}s a {b / FPS:.1f}s da gravação): a edição ou o roteiro mudou "
+                       f"depois do tratar. Rode de novo (só os trechos em que você aparece, uns minutos) e monte: "
+                       f"humanim tratar {relativo(original)}")
         return tratada, True, ""
     if tratada.exists():
         return original, False, ("\nAtenção: gravacao-tratada.webm não é desta gravacao.webm (é de outra gravação "
@@ -75,7 +82,7 @@ def normalizar(pasta, gravacao, com_alfa):
     video, audio = t / "gravacao-30fps.mkv", t / "gravacao.wav"
     decodificador = ["-c:v", "libvpx-vp9"] if com_alfa else []  # sem isso o alfa do VP9 some
     rodar(["ffmpeg", "-nostdin", "-y", "-v", "error", *decodificador, "-i", gravacao, "-map", "0:v:0",
-           "-vf", f"{VIDEO_DO_ZERO},crop='trunc(min(iw,ih*3/4)/2)*2':'trunc(min(ih,iw*4/3)/2)*2'",
+           "-vf", f"{VIDEO_DO_ZERO},{MIOLO_3X4}",
            "-c:v", "ffv1", "-pix_fmt", "yuva420p" if com_alfa else "yuv420p", video],
           f"normalizar o vídeo de {gravacao.name}")
     rodar(["ffmpeg", "-nostdin", "-y", "-v", "error", "-i", pasta / "gravacao.webm", "-map", "0:a:0",
@@ -159,18 +166,28 @@ def enquadrar_canto(video, indices):
     return int(x0 * w) // 2 * 2, h - ch, cw, ch
 
 
-def segmento(linha, pecas, clipe, video, com_alfa, recorte, destino):
-    """A imagem de uma linha: exatamente sum(quadros) quadros, peça a peça da gravação."""
+def segmento(linha, pecas, clipe, video, com_alfa, recorte, destino, fundo=None):
+    """A imagem de uma linha: exatamente sum(quadros) quadros, peça a peça da gravação.
+
+    `fundo`: no [CARA] sem fundo, (clipe, "fim" ou "inicio") da animação que fica atrás de você, parada
+    (roteiro.vizinha_animada); sem ele, preto."""
     n = sum(p.quadros for p in pecas)
     cmd = ["ffmpeg", "-nostdin", "-y", "-v", "error"]
-    if linha.marca == "CARA":
+    primeira = 0
+    if linha.marca == "CARA" and com_alfa and fundo:
+        atras, onde = fundo
+        cmd += [*(["-sseof", "-0.1"] if onde == "fim" else []), "-i", atras]
+        primeira = 1
+        filtros = [f"[0:v]trim=end_frame=1,scale={LARGURA}:{ALTURA},setsar=1,{fundo_do_cara()},"
+                   f"loop=loop=-1:size=1,setpts=N/({FPS}*TB)[base]"]
+    elif linha.marca == "CARA":
         filtros = [f"color=c=black:s={LARGURA}x{ALTURA}:r={FPS}[base]"]
     else:
         cmd += ["-i", clipe]
         filtros = [f"[0:v]setpts=N/({FPS}*TB),scale={LARGURA}:{ALTURA},setsar=1,tpad=stop_mode=clone:stop=2[base]"]
     saida = "[base]"
     if linha.marca != "ANIM":
-        primeira = 0 if linha.marca == "CARA" else 1
+        primeira = primeira if linha.marca == "CARA" else 1
         if linha.marca == "CARA":
             x, y = 0, 0
         else:
@@ -239,7 +256,10 @@ def main(args):
     curtas = [t.linha for t, n in zip(tempos, contagens) if n < 1]
     if curtas:
         raise Erro(f"linha(s) {curtas} duram menos de um quadro no tempos.json. Grave de novo essas linhas.")
-    gravacao, com_alfa, aviso = escolher_gravacao(pasta)
+    plano, pulos = planejar(linhas, tempos, contagens)
+    precisa = [(p.fonte, p.fonte + p.quadros) for linha, pecas in zip(linhas, plano) if linha.marca != "ANIM"
+               for p in pecas]
+    gravacao, com_alfa, aviso = escolher_gravacao(pasta, precisa)
     conferir_cenas(pasta, linhas, contagens)
 
     video, audio = normalizar(pasta, gravacao, com_alfa)
@@ -250,14 +270,15 @@ def main(args):
                        f"{min(fim_video, fim_audio):.2f}s. tempos.json não é desta gravação: grave de novo.")
 
     t = trabalho(pasta)
-    plano, pulos = planejar(linhas, tempos, contagens)
     no_canto = [p.fonte + k for linha, pecas in zip(linhas, plano) if linha.marca == "CANTO"
                 for p in pecas for k in range(0, p.quadros, max(1, p.quadros // 4))]
     recorte = enquadrar_canto(video, no_canto[::max(1, len(no_canto) // 24)]) if com_alfa and no_canto else None
     segmentos = []
-    for linha, pecas in zip(linhas, plano):
+    for i, (linha, pecas) in enumerate(zip(linhas, plano)):
         destino = t / f"seg_{linha.numero:02d}.mp4"
-        segmento(linha, pecas, pasta / "cenas" / f"{linha.cena}.mp4", video, com_alfa, recorte, destino)
+        vizinha = vizinha_animada(linhas, i) if linha.marca == "CARA" else None
+        fundo = (pasta / "cenas" / f"{vizinha[0].cena}.mp4", vizinha[1]) if vizinha else None
+        segmento(linha, pecas, pasta / "cenas" / f"{linha.cena}.mp4", video, com_alfa, recorte, destino, fundo)
         segmentos.append(destino)
     lista = t / "segmentos.txt"
     lista.write_text("".join(f"file '{s}'\n" for s in segmentos), encoding="utf-8")

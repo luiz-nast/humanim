@@ -11,9 +11,9 @@ import textwrap
 from pathlib import Path
 
 from .animar import ler_feitas, motivo_da_cena, por_motivo
-from .comum import Erro, comandos, contar_quadros, ok, pasta_do_video, relativo, rodar, trabalho
+from .comum import Erro, comandos, contar_quadros, fundo_do_cara, ok, pasta_do_video, relativo, rodar, trabalho
 from .formato import CANTO, FPS, LARGURA, lados_soltos
-from .roteiro import EDICAO, ler_roteiro, ler_tempos, quadros
+from .roteiro import EDICAO, ler_roteiro, ler_tempos, quadros, vizinha_animada
 
 L, A = 540, 960  # meio tamanho: sai rápido e basta para ver
 K = L / LARGURA
@@ -69,11 +69,14 @@ def main(args):
                                f"fontsize={tamanho}:fontcolor={cor}:x={x}:y={y}+{i * round(tamanho * 1.4)}")
         return ",".join(filtros)
 
-    segmentos, avisos, dados, inicio = [], [], [], 0
+    segmentos, avisos, dados, inicio, usadas = [], [], [], 0, {}
     for linha, n in zip(linhas, contagens):
+        if linha.tem_animacao:
+            usadas[linha.numero] = conferir(pasta, linha, n, feitas)
+    for i, (linha, n) in enumerate(zip(linhas, contagens)):
         motivo, usa = "", False
         if linha.tem_animacao:
-            usa, motivo = conferir(pasta, linha, n, feitas)
+            usa, motivo = usadas[linha.numero]
             if motivo:
                 avisos.append((linha.numero, motivo))
         dados.append({"n": linha.numero, "marca": linha.marca, "descricao": linha.descricao, "fala": linha.fala,
@@ -102,8 +105,16 @@ def main(args):
                  + escrever(f"{cena}-b", 26, "0xb8a8a8", 380, f"linha {linha.numero} · {linha.marca}", "",
                             *textwrap.wrap(linha.descricao, 30)[:8]))
         else:
-            f = (f"color=c=black:s={L}x{A}:r={FPS},trim=end_frame={n},"
-                 + escrever(cena, 110, "0x5a5a5a", "(h-text_h)/2", "VOCÊ"))
+            # atrás de você, a animação vizinha parada, como no montar com a gravação sem fundo
+            vizinha = vizinha_animada(linhas, i)
+            if vizinha and usadas[vizinha[0].numero][0]:
+                entrada = [*(["-sseof", "-0.1"] if vizinha[1] == "fim" else []),
+                           "-i", pasta / "cenas" / f"{vizinha[0].cena}.mp4"]
+                f = (f"[0:v]trim=end_frame=1,scale={L}:{A},setsar=1,{fundo_do_cara(K)},loop=loop=-1:size=1,"
+                     f"setpts=N/({FPS}*TB),trim=end_frame={n},")
+            else:
+                f = f"color=c=black:s={L}x{A}:r={FPS},trim=end_frame={n},"
+            f += escrever(cena, 110, "0xb0b0b0", "(h-text_h)/2", "VOCÊ")
         destino = textos / f"seg_{linha.numero:02d}.mp4"
         rodar(["ffmpeg", "-nostdin", "-y", "-v", "error", *entrada, "-filter_complex", f"{f},format=yuv420p[v]",
                "-map", "[v]", "-frames:v", n, *X264, "-an", destino], f"ffmpeg na prévia da linha {linha.numero}")
@@ -121,15 +132,19 @@ def main(args):
     pagina = {"titulo": pasta.name, "estimado": estimado, "duracao": round(total, 3),
               "video": f".trabalho/previa.mp4?v={video.stat().st_mtime_ns}", "linhas": dados}
     html = pasta / "previa.html"
-    primeira = not html.exists()
+    aberta = t / "previa-aberta"  # existe depois que esta prévia foi aberta no navegador
+    primeira = not html.exists() or not aberta.exists()
     embutido = json.dumps(pagina, ensure_ascii=False).replace("</", "<\\/")
     html.write_text(MODELO.read_text(encoding="utf-8").replace("__DADOS__", embutido), encoding="utf-8")
 
     # Abre só na primeira vez: depois a aba já está no navegador, e abrir de novo empilha abas iguais.
     if args.nao_abrir:
         onde = ""
+    elif primeira and abrir(html):
+        aberta.touch()
+        onde = " · aberta no navegador"
     elif primeira:
-        onde = " · aberta no navegador" if abrir(html) else f" · abra no navegador: {html.as_uri()}"
+        onde = f" · abra no navegador: {html.as_uri()}"
     else:
         onde = f" · recarregue a aba da prévia (F5); se ela foi fechada, abra: {html.as_uri()}"
     origem = ("estimados (pelo tamanho das falas)" if estimado else
