@@ -5,6 +5,7 @@ Ideias de vídeo, uma por item, com o slug da pasta em `videos/`. Quando um rote
 ## Ideias
 
 - [x] Como a árvore de decisão escolhe a pergunta: impureza de Gini (`arvore-de-decisao`)
+- [x] Como o KNN acha os vizinhos, e por que sem padronizar o peso em gramas escolhe sozinho (pinguins de Palmer) (`knn`)
 - [ ] Quem foi o pai do deep learning (`pai-do-deep-learning`). Na direção do canal, o vídeo precisa de um mecanismo para quebrar: a retropropagação (Rumelhart, Hinton e Williams, 1986), a conta que fez as redes de várias camadas aprenderem; a disputa pelo título de "pai" entra como parte da história (regra 11), sem escolher um lado.
 
 ## Sugestões da IA

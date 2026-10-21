@@ -94,6 +94,7 @@ São medições feitas com uma gravação de teste. A primeira gravação de ver
 | Vídeo | O que explica | Dados | Situação |
 | --- | --- | --- | --- |
 | [Árvore de decisão](videos/arvore-de-decisao/roteiro.md?plain=1) | Como a árvore escolhe a melhor pergunta para separar quem paga de quem dá calote | 30 mil clientes de cartão de crédito de Taiwan, 2005, da [base pública da Universidade da Califórnia em Irvine](https://archive.ics.uci.edu/dataset/350/default+of+credit+card+clients) | roteiro, animações e prévia prontos; falta gravar |
+| [KNN, k vizinhos mais próximos](videos/knn/roteiro.md?plain=1) | Por que, sem padronizar as medidas, o peso em gramas decide sozinho quem é vizinho | 342 pinguins da Antártida (Palmer Station, Gorman, Williams & Fraser, 2014), via [palmerpenguins](https://allisonhorst.github.io/palmerpenguins/), domínio público | roteiro, animações e prévia prontos; falta gravar |
 
 Cada pasta em `videos/` guarda o projeto do vídeo: o roteiro, a pesquisa escrita ([exemplo das fontes](videos/arvore-de-decisao/fontes.md)), os dados, o programa que calcula os números e o código das animações. A gravação e o vídeo final ficam só no computador, porque são pesados demais para o GitHub.
 

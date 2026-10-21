@@ -1,0 +1,2981 @@
+{
+ "dataset": {
+  "nome": "Palmer Penguins (penguins.csv do pacote R palmerpenguins)",
+  "url": "https://raw.githubusercontent.com/allisonhorst/palmerpenguins/main/inst/extdata/penguins.csv",
+  "sha256": "f204db2c753b0937caac3cb35258562c14f073e4bbc76be24b4c51ce22767a93",
+  "bytes": 15241,
+  "licenca": "CC0 1.0 (LICENSE.md do repositório)",
+  "linhas_no_arquivo": 344,
+  "tiradas_sem_medidas": [
+   {
+    "linha_csv": 5,
+    "especie": "Adélia",
+    "ilha": "Torgersen"
+   },
+   {
+    "linha_csv": 273,
+    "especie": "Gentoo",
+    "ilha": "Biscoe"
+   }
+  ],
+  "ficam": 342,
+  "massas_todas_multiplas_de_25_g": true,
+  "faixas": {
+   "bico_mm": [
+    32.1,
+    59.6
+   ],
+   "massa_g": [
+    2700,
+    6300
+   ]
+  }
+ },
+ "convencao": {
+  "k": 5,
+  "distancia": "euclidiana, d = √(Δbico² + Δmassa²)",
+  "voto": "maioria; empate 2 a 2: entre as empatadas, a espécie do vizinho mais próximo",
+  "empate_de_distancia": "na 5ª vaga, entra quem vem antes no arquivo (nunca muda a previsão: conferido)",
+  "padronizacao": "z = (x − média) ÷ desvio, ddof=0, refeita a cada rodada com os 341 que votam",
+  "avaliacao": "deixar-um-de-fora (342 rodadas)",
+  "nomes": {
+   "Adelie": "Adélia",
+   "Gentoo": "Gentoo",
+   "Chinstrap": "Barbicha"
+  }
+ },
+ "contagem": {
+  "Adélia": 151,
+  "Gentoo": 123,
+  "Barbicha": 68
+ },
+ "estatisticas_342": {
+  "media_bico_mm": 43.9219,
+  "desvio_bico_mm": 5.4516,
+  "media_massa_g": 4201.75,
+  "desvio_massa_g": 800.78,
+  "ddof": 0,
+  "por_especie": {
+   "Adélia": {
+    "bico_mm": 38.791,
+    "massa_g": 3700.7,
+    "bico_min_max_mm": [
+     32.1,
+     46.0
+    ],
+    "massa_min_max_g": [
+     2850,
+     4775
+    ]
+   },
+   "Barbicha": {
+    "bico_mm": 48.834,
+    "massa_g": 3733.1,
+    "bico_min_max_mm": [
+     40.9,
+     58.0
+    ],
+    "massa_min_max_g": [
+     2700,
+     4800
+    ]
+   },
+   "Gentoo": {
+    "bico_mm": 47.505,
+    "massa_g": 5076.0,
+    "bico_min_max_mm": [
+     40.9,
+     59.6
+    ],
+    "massa_min_max_g": [
+     3950,
+     6300
+    ]
+   }
+  }
+ },
+ "avaliacao": {
+  "2_medidas": {
+   "cru": {
+    "acertos": 271,
+    "total": 342,
+    "acuracia": 0.7924,
+    "acuracia_tela": "79,2%",
+    "conta_tela": "271 ÷ 342 = 79,2%",
+    "por_especie": {
+     "Adélia": {
+      "acertos": 129,
+      "total": 151,
+      "acuracia": 0.8543,
+      "previsto_como": {
+       "Adélia": 129,
+       "Barbicha": 8,
+       "Gentoo": 14
+      }
+     },
+     "Barbicha": {
+      "acertos": 30,
+      "total": 68,
+      "acuracia": 0.4412,
+      "previsto_como": {
+       "Adélia": 33,
+       "Barbicha": 30,
+       "Gentoo": 5
+      }
+     },
+     "Gentoo": {
+      "acertos": 112,
+      "total": 123,
+      "acuracia": 0.9106,
+      "previsto_como": {
+       "Adélia": 11,
+       "Barbicha": 0,
+       "Gentoo": 112
+      }
+     }
+    },
+    "empates_no_voto": 13,
+    "acertos_com_outro_desempate_do_voto": {
+     "vizinho_1_decide": 269,
+     "alfabetica_como_scikit_learn": 274
+    },
+    "empates_de_distancia_na_5a_vaga": 8,
+    "empates_de_distancia_que_mudam_a_previsao": 0
+   },
+   "rodada": {
+    "acertos": 318,
+    "total": 342,
+    "acuracia": 0.9298,
+    "acuracia_tela": "93,0%",
+    "conta_tela": "318 ÷ 342 = 93,0%",
+    "por_especie": {
+     "Adélia": {
+      "acertos": 141,
+      "total": 151,
+      "acuracia": 0.9338,
+      "previsto_como": {
+       "Adélia": 141,
+       "Barbicha": 1,
+       "Gentoo": 9
+      }
+     },
+     "Barbicha": {
+      "acertos": 60,
+      "total": 68,
+      "acuracia": 0.8824,
+      "previsto_como": {
+       "Adélia": 5,
+       "Barbicha": 60,
+       "Gentoo": 3
+      }
+     },
+     "Gentoo": {
+      "acertos": 117,
+      "total": 123,
+      "acuracia": 0.9512,
+      "previsto_como": {
+       "Adélia": 6,
+       "Barbicha": 0,
+       "Gentoo": 117
+      }
+     }
+    },
+    "empates_no_voto": 5,
+    "acertos_com_outro_desempate_do_voto": {
+     "vizinho_1_decide": 318,
+     "alfabetica_como_scikit_learn": 318
+    },
+    "empates_de_distancia_na_5a_vaga": 26,
+    "empates_de_distancia_que_mudam_a_previsao": 0
+   },
+   "tudo": {
+    "acertos": 318,
+    "total": 342,
+    "acuracia": 0.9298,
+    "acuracia_tela": "93,0%",
+    "conta_tela": "318 ÷ 342 = 93,0%",
+    "por_especie": {
+     "Adélia": {
+      "acertos": 141,
+      "total": 151,
+      "acuracia": 0.9338,
+      "previsto_como": {
+       "Adélia": 141,
+       "Barbicha": 1,
+       "Gentoo": 9
+      }
+     },
+     "Barbicha": {
+      "acertos": 60,
+      "total": 68,
+      "acuracia": 0.8824,
+      "previsto_como": {
+       "Adélia": 5,
+       "Barbicha": 60,
+       "Gentoo": 3
+      }
+     },
+     "Gentoo": {
+      "acertos": 117,
+      "total": 123,
+      "acuracia": 0.9512,
+      "previsto_como": {
+       "Adélia": 6,
+       "Barbicha": 0,
+       "Gentoo": 117
+      }
+     }
+    },
+    "empates_no_voto": 5,
+    "acertos_com_outro_desempate_do_voto": {
+     "vizinho_1_decide": 318,
+     "alfabetica_como_scikit_learn": 318
+    },
+    "empates_de_distancia_na_5a_vaga": 27,
+    "empates_de_distancia_que_mudam_a_previsao": 0
+   },
+   "cru_para_padronizado": {
+    "mudam_de_previsao": 57,
+    "de_errado_para_certo": 51,
+    "de_certo_para_errado": 4,
+    "de_errado_para_outro_errado": 2
+   },
+   "padronizar_por_rodada_vs_de_uma_vez": {
+    "previsoes_diferentes": 0,
+    "acertos_por_rodada": 318,
+    "acertos_de_uma_vez": 318
+   }
+  },
+  "4_medidas": {
+   "cru": {
+    "acertos": 274,
+    "total": 342,
+    "acuracia": 0.8012,
+    "acuracia_tela": "80,1%",
+    "conta_tela": "274 ÷ 342 = 80,1%",
+    "por_especie": {
+     "Adélia": {
+      "acertos": 130,
+      "total": 151,
+      "acuracia": 0.8609,
+      "previsto_como": {
+       "Adélia": 130,
+       "Barbicha": 11,
+       "Gentoo": 10
+      }
+     },
+     "Barbicha": {
+      "acertos": 29,
+      "total": 68,
+      "acuracia": 0.4265,
+      "previsto_como": {
+       "Adélia": 36,
+       "Barbicha": 29,
+       "Gentoo": 3
+      }
+     },
+     "Gentoo": {
+      "acertos": 115,
+      "total": 123,
+      "acuracia": 0.935,
+      "previsto_como": {
+       "Adélia": 7,
+       "Barbicha": 1,
+       "Gentoo": 115
+      }
+     }
+    },
+    "empates_no_voto": 19,
+    "acertos_com_outro_desempate_do_voto": {
+     "vizinho_1_decide": 276,
+     "alfabetica_como_scikit_learn": 276
+    },
+    "empates_de_distancia_na_5a_vaga": 0,
+    "empates_de_distancia_que_mudam_a_previsao": 0
+   },
+   "rodada": {
+    "acertos": 337,
+    "total": 342,
+    "acuracia": 0.9854,
+    "acuracia_tela": "98,5%",
+    "conta_tela": "337 ÷ 342 = 98,5%",
+    "por_especie": {
+     "Adélia": {
+      "acertos": 150,
+      "total": 151,
+      "acuracia": 0.9934,
+      "previsto_como": {
+       "Adélia": 150,
+       "Barbicha": 1,
+       "Gentoo": 0
+      }
+     },
+     "Barbicha": {
+      "acertos": 64,
+      "total": 68,
+      "acuracia": 0.9412,
+      "previsto_como": {
+       "Adélia": 4,
+       "Barbicha": 64,
+       "Gentoo": 0
+      }
+     },
+     "Gentoo": {
+      "acertos": 123,
+      "total": 123,
+      "acuracia": 1.0,
+      "previsto_como": {
+       "Adélia": 0,
+       "Barbicha": 0,
+       "Gentoo": 123
+      }
+     }
+    },
+    "empates_no_voto": 0,
+    "acertos_com_outro_desempate_do_voto": {
+     "vizinho_1_decide": 337,
+     "alfabetica_como_scikit_learn": 337
+    },
+    "empates_de_distancia_na_5a_vaga": 0,
+    "empates_de_distancia_que_mudam_a_previsao": 0
+   },
+   "tudo": {
+    "acertos": 337,
+    "total": 342,
+    "acuracia": 0.9854,
+    "acuracia_tela": "98,5%",
+    "conta_tela": "337 ÷ 342 = 98,5%",
+    "por_especie": {
+     "Adélia": {
+      "acertos": 150,
+      "total": 151,
+      "acuracia": 0.9934,
+      "previsto_como": {
+       "Adélia": 150,
+       "Barbicha": 1,
+       "Gentoo": 0
+      }
+     },
+     "Barbicha": {
+      "acertos": 64,
+      "total": 68,
+      "acuracia": 0.9412,
+      "previsto_como": {
+       "Adélia": 4,
+       "Barbicha": 64,
+       "Gentoo": 0
+      }
+     },
+     "Gentoo": {
+      "acertos": 123,
+      "total": 123,
+      "acuracia": 1.0,
+      "previsto_como": {
+       "Adélia": 0,
+       "Barbicha": 0,
+       "Gentoo": 123
+      }
+     }
+    },
+    "empates_no_voto": 0,
+    "acertos_com_outro_desempate_do_voto": {
+     "vizinho_1_decide": 337,
+     "alfabetica_como_scikit_learn": 337
+    },
+    "empates_de_distancia_na_5a_vaga": 0,
+    "empates_de_distancia_que_mudam_a_previsao": 0
+   },
+   "cru_para_padronizado": {
+    "mudam_de_previsao": 65,
+    "de_errado_para_certo": 64,
+    "de_certo_para_errado": 1,
+    "de_errado_para_outro_errado": 0
+   },
+   "padronizar_por_rodada_vs_de_uma_vez": {
+    "previsoes_diferentes": 0,
+    "acertos_por_rodada": 337,
+    "acertos_de_uma_vez": 337
+   }
+  }
+ },
+ "scikit_learn": {
+  "versao": "1.9.1",
+  "2_medidas": {
+   "cru": {
+    "acertos_scikit_learn": 274,
+    "acertos_a_mao_com_o_desempate_da_pauta": 271,
+    "previsoes_diferentes_da_pauta": 5,
+    "todas_as_diferencas_sao_empate_no_voto": true,
+    "previsoes_diferentes_com_o_mesmo_desempate_alfabetico": 0
+   },
+   "padronizado": {
+    "acertos_scikit_learn": 318,
+    "acertos_a_mao_com_o_desempate_da_pauta": 318,
+    "previsoes_diferentes_da_pauta": 2,
+    "todas_as_diferencas_sao_empate_no_voto": true,
+    "previsoes_diferentes_com_o_mesmo_desempate_alfabetico": 0
+   }
+  },
+  "4_medidas": {
+   "cru": {
+    "acertos_scikit_learn": 276,
+    "acertos_a_mao_com_o_desempate_da_pauta": 274,
+    "previsoes_diferentes_da_pauta": 5,
+    "todas_as_diferencas_sao_empate_no_voto": true,
+    "previsoes_diferentes_com_o_mesmo_desempate_alfabetico": 0
+   },
+   "padronizado": {
+    "acertos_scikit_learn": 337,
+    "acertos_a_mao_com_o_desempate_da_pauta": 337,
+    "previsoes_diferentes_da_pauta": 0,
+    "todas_as_diferencas_sao_empate_no_voto": true,
+    "previsoes_diferentes_com_o_mesmo_desempate_alfabetico": 0
+   }
+  },
+  "nota": "O scikit-learn desempata o voto pela espécie de nome menor (Adelie < Chinstrap < Gentoo). Com esse mesmo desempate, a conta à mão dá previsões idênticas às dele nos 342, nos 4 casos."
+ },
+ "peso_da_massa": {
+  "todos_os_pares_fracao_da_soma_que_vem_da_massa": 0.999954,
+  "todos_os_pares_nota": "Σ Δmassa² ÷ Σ (Δbico² + Δmassa²) sobre todos os pares = var_massa ÷ (var_bico + var_massa), exato",
+  "pares_pinguim_vizinho_cru": 1710,
+  "vizinhos_crus_com_a_mesma_massa_exata": 1210,
+  "vizinhos_crus_identicos_nas_duas_medidas": 10,
+  "vizinhos_crus_fracao_da_soma_total_que_vem_da_massa": 0.9746,
+  "vizinhos_crus_fracao_media_por_par_sem_os_identicos": 0.2913,
+  "pinguins_cujos_5_vizinhos_crus_sao_os_5_de_massa_mais_parecida": 342,
+  "razao_desvio_massa_por_desvio_bico": 146.89,
+  "nota": "A fração média por par é baixa porque, nos vizinhos de massa igual, Δmassa² = 0 e só o bico sobra: é a massa que escolhe os vizinhos (os de peso igual), e o bico só desempata entre eles."
+ },
+ "pinguim_misterioso": {
+  "linha_csv": 320,
+  "numero_entre_os_344": 319,
+  "especie_real": "Barbicha",
+  "ilha": "Dream",
+  "sexo": "male",
+  "ano": 2008,
+  "bico_mm": 50.9,
+  "massa_g": 3550,
+  "z_da_rodada": {
+   "bico": 1.285,
+   "massa": -0.8159
+  },
+  "z_com_os_342": {
+   "bico": 1.28,
+   "massa": -0.8139
+  },
+  "padronizacao_da_rodada": {
+   "media_bico_mm": 43.9015,
+   "desvio_bico_mm": 5.4465,
+   "media_massa_g": 4203.67,
+   "desvio_massa_g": 801.18,
+   "nota": "dos 341 que votam (sem ele); arredondados, são os mesmos 5,45 mm e 801 g dos 342"
+  },
+  "candidatos_5_a_0_nos_dois_jeitos": [
+   320,
+   341
+  ],
+  "erra_cru_acerta_padronizado_total": 51,
+  "cru": {
+   "vizinhos": [
+    {
+     "linha_csv": 39,
+     "especie": "Adélia",
+     "ilha": "Dream",
+     "sexo": "female",
+     "ano": 2007,
+     "bico_mm": 42.2,
+     "massa_g": 3550,
+     "delta_bico_mm": -8.7,
+     "delta_massa_g": 0,
+     "distancia": 8.7,
+     "tela": {
+      "bico": "42,2 mm",
+      "massa": "3.550 g",
+      "distancia": "8,7"
+     }
+    },
+    {
+     "linha_csv": 87,
+     "especie": "Adélia",
+     "ilha": "Dream",
+     "sexo": "male",
+     "ano": 2008,
+     "bico_mm": 41.3,
+     "massa_g": 3550,
+     "delta_bico_mm": -9.6,
+     "delta_massa_g": 0,
+     "distancia": 9.6,
+     "tela": {
+      "bico": "41,3 mm",
+      "massa": "3.550 g",
+      "distancia": "9,6"
+     }
+    },
+    {
+     "linha_csv": 28,
+     "especie": "Adélia",
+     "ilha": "Biscoe",
+     "sexo": "male",
+     "ano": 2007,
+     "bico_mm": 40.6,
+     "massa_g": 3550,
+     "delta_bico_mm": -10.3,
+     "delta_massa_g": 0,
+     "distancia": 10.3,
+     "tela": {
+      "bico": "40,6 mm",
+      "massa": "3.550 g",
+      "distancia": "10,3"
+     }
+    },
+    {
+     "linha_csv": 107,
+     "especie": "Adélia",
+     "ilha": "Biscoe",
+     "sexo": "male",
+     "ano": 2009,
+     "bico_mm": 39.7,
+     "massa_g": 3550,
+     "delta_bico_mm": -11.2,
+     "delta_massa_g": 0,
+     "distancia": 11.2,
+     "tela": {
+      "bico": "39,7 mm",
+      "massa": "3.550 g",
+      "distancia": "11,2"
+     }
+    },
+    {
+     "linha_csv": 74,
+     "especie": "Adélia",
+     "ilha": "Torgersen",
+     "sexo": "female",
+     "ano": 2008,
+     "bico_mm": 39.6,
+     "massa_g": 3550,
+     "delta_bico_mm": -11.3,
+     "delta_massa_g": 0,
+     "distancia": 11.3,
+     "tela": {
+      "bico": "39,6 mm",
+      "massa": "3.550 g",
+      "distancia": "11,3"
+     }
+    }
+   ],
+   "voto": {
+    "Adélia": 5
+   },
+   "previsao": "Adélia",
+   "empate_no_voto": false
+  },
+  "padronizado": {
+   "vizinhos": [
+    {
+     "linha_csv": 280,
+     "especie": "Barbicha",
+     "ilha": "Dream",
+     "sexo": "male",
+     "ano": 2007,
+     "bico_mm": 51.3,
+     "massa_g": 3650,
+     "delta_bico_mm": 0.4,
+     "delta_massa_g": 100,
+     "distancia": 0.1448,
+     "tela": {
+      "bico": "51,3 mm",
+      "massa": "3.650 g",
+      "distancia": "0,14"
+     }
+    },
+    {
+     "linha_csv": 322,
+     "especie": "Barbicha",
+     "ilha": "Dream",
+     "sexo": "female",
+     "ano": 2009,
+     "bico_mm": 50.9,
+     "massa_g": 3675,
+     "delta_bico_mm": 0.0,
+     "delta_massa_g": 125,
+     "distancia": 0.156,
+     "tela": {
+      "bico": "50,9 mm",
+      "massa": "3.675 g",
+      "distancia": "0,16"
+     }
+    },
+    {
+     "linha_csv": 287,
+     "especie": "Barbicha",
+     "ilha": "Dream",
+     "sexo": "male",
+     "ano": 2007,
+     "bico_mm": 51.3,
+     "massa_g": 3700,
+     "delta_bico_mm": 0.4,
+     "delta_massa_g": 150,
+     "distancia": 0.2011,
+     "tela": {
+      "bico": "51,3 mm",
+      "massa": "3.700 g",
+      "distancia": "0,20"
+     }
+    },
+    {
+     "linha_csv": 304,
+     "especie": "Barbicha",
+     "ilha": "Dream",
+     "sexo": "female",
+     "ano": 2008,
+     "bico_mm": 50.5,
+     "massa_g": 3400,
+     "delta_bico_mm": -0.4,
+     "delta_massa_g": -150,
+     "distancia": 0.2011,
+     "tela": {
+      "bico": "50,5 mm",
+      "massa": "3.400 g",
+      "distancia": "0,20"
+     }
+    },
+    {
+     "linha_csv": 312,
+     "especie": "Barbicha",
+     "ilha": "Dream",
+     "sexo": "male",
+     "ano": 2008,
+     "bico_mm": 49.7,
+     "massa_g": 3600,
+     "delta_bico_mm": -1.2,
+     "delta_massa_g": 50,
+     "distancia": 0.229,
+     "tela": {
+      "bico": "49,7 mm",
+      "massa": "3.600 g",
+      "distancia": "0,23"
+     }
+    }
+   ],
+   "voto": {
+    "Barbicha": 5
+   },
+   "previsao": "Barbicha",
+   "empate_no_voto": false,
+   "nota_ordem": "o 3º e o 4º estão exatamente empatados (Δbico ±0,4 mm, Δmassa ±150 g); a ordem entre eles é a do arquivo e não muda nada"
+  },
+  "vizinhos_em_comum": 0,
+  "filas": {
+   "primeira_barbicha_na_fila_crua": 9,
+   "barbicha_mais_perto_padronizado_na_fila_crua": 30,
+   "adelia_mais_perto_cru_na_fila_padronizada": 89,
+   "primeira_adelia_na_fila_padronizada": 58,
+   "adelias_com_a_mesma_massa": 8,
+   "barbichas_com_a_mesma_massa_alem_dele": 0,
+   "gentoos_com_a_mesma_massa": 0
+  },
+  "contas": {
+   "ate_a_adelia": {
+    "vizinho": {
+     "linha_csv": 39,
+     "especie": "Adélia",
+     "ilha": "Dream",
+     "sexo": "female",
+     "ano": 2007,
+     "bico_mm": 42.2,
+     "massa_g": 3550,
+     "delta_bico_mm": -8.7,
+     "delta_massa_g": 0,
+     "distancia": 8.7,
+     "tela": {
+      "bico": "42,2 mm",
+      "massa": "3.550 g",
+      "distancia": "8,7"
+     }
+    },
+    "cru": {
+     "termos": {
+      "delta_bico": "8,7",
+      "delta_massa": "0",
+      "bico_ao_quadrado": "75,69",
+      "massa_ao_quadrado": "0",
+      "soma": "75,69",
+      "raiz": "8,7"
+     },
+     "linha_unica": "d = √(8,7² + 0²) = √(75,69 + 0) = √75,69 = 8,7",
+     "massa_na_soma": "0,00%"
+    },
+    "cru_exato": 8.7,
+    "padronizado": {
+     "delta_bico_em_desvios": "8,7 mm ÷ 5,45 = 1,60",
+     "delta_massa_em_desvios": "0 g ÷ 801 = 0",
+     "termos": {
+      "delta_bico": "1,60",
+      "delta_massa": "0",
+      "bico_ao_quadrado": "2,56",
+      "massa_ao_quadrado": "0",
+      "soma": "2,56",
+      "raiz": "1,60"
+     },
+     "linha_unica": "d = √(1,60² + 0²) = √(2,56 + 0) = √2,56 = 1,60",
+     "massa_na_soma": "0,00%"
+    },
+    "padronizado_exato": 1.5974,
+    "confere": "a raiz da conta encadeada é igual à distância exata arredondada, nos dois jeitos"
+   },
+   "ate_a_barbicha": {
+    "vizinho": {
+     "linha_csv": 280,
+     "especie": "Barbicha",
+     "ilha": "Dream",
+     "sexo": "male",
+     "ano": 2007,
+     "bico_mm": 51.3,
+     "massa_g": 3650,
+     "delta_bico_mm": 0.4,
+     "delta_massa_g": 100,
+     "distancia": 100.0008,
+     "tela": {
+      "bico": "51,3 mm",
+      "massa": "3.650 g",
+      "distancia": "100,0"
+     }
+    },
+    "cru": {
+     "termos": {
+      "delta_bico": "0,4",
+      "delta_massa": "100",
+      "bico_ao_quadrado": "0,16",
+      "massa_ao_quadrado": "10.000",
+      "soma": "10.000,16",
+      "raiz": "100,0"
+     },
+     "linha_unica": "d = √(0,4² + 100²) = √(0,16 + 10.000) = √10.000,16 = 100,0",
+     "massa_na_soma": "100,00%"
+    },
+    "cru_exato": 100.0008,
+    "padronizado": {
+     "delta_bico_em_desvios": "0,4 mm ÷ 5,45 = 0,07",
+     "delta_massa_em_desvios": "100 g ÷ 801 = 0,12",
+     "termos": {
+      "delta_bico": "0,07",
+      "delta_massa": "0,12",
+      "bico_ao_quadrado": "0,0049",
+      "massa_ao_quadrado": "0,0144",
+      "soma": "0,0193",
+      "raiz": "0,14"
+     },
+     "linha_unica": "d = √(0,07² + 0,12²) = √(0,0049 + 0,0144) = √0,0193 = 0,14",
+     "massa_na_soma": "74,61%"
+    },
+    "padronizado_exato": 0.1448,
+    "confere": "a raiz da conta encadeada é igual à distância exata arredondada, nos dois jeitos"
+   }
+  }
+ },
+ "para_tela": {
+  "formato": "Como o br() de estilo/estilo.py: ponto no milhar, vírgula no decimal, menos U+2212. Bico em mm com 1 casa; massa em g inteira; desvio do bico com 2 casas e da massa inteiro; distância crua com 1 casa e sem unidade (ela soma mm com g); distância padronizada com 2 casas (em desvios); acurácia em % com 1 casa.",
+  "dataset": "Palmer Penguins: 342 pinguins de verdade do arquipélago de Palmer, Antártida, medidos de 2007 a 2009",
+  "fonte_curta": "Gorman, Williams & Fraser (2014), PLOS ONE · pacote palmerpenguins (Horst, Hill & Gorman, 2020) · CC0",
+  "contagem": {
+   "Adélia": "151",
+   "Gentoo": "123",
+   "Barbicha": "68"
+  },
+  "contagem_conta": "151 + 123 + 68 = 342",
+  "medias": {
+   "bico": "43,9 mm",
+   "massa": "4.202 g"
+  },
+  "desvios": {
+   "bico": "5,45 mm",
+   "massa": "801 g"
+  },
+  "medias_por_especie": {
+   "Adélia": {
+    "bico": "38,8 mm",
+    "massa": "3.701 g"
+   },
+   "Barbicha": {
+    "bico": "48,8 mm",
+    "massa": "3.733 g"
+   },
+   "Gentoo": {
+    "bico": "47,5 mm",
+    "massa": "5.076 g"
+   }
+  },
+  "intuicao_especies": "Adélia e Barbicha pesam quase o mesmo (3.701 g e 3.733 g, 32 g de diferença); o que separa as duas é o bico: 38,8 mm contra 48,8 mm, 10 mm a mais na Barbicha. A Gentoo é a pesada (5.076 g).",
+  "distancia": {
+   "formula": "d = √(Δbico² + Δmassa²)",
+   "intuicao": "A régua de linha reta no gráfico: diferença de bico ao quadrado mais diferença de massa ao quadrado, e a raiz."
+  },
+  "padronizar": {
+   "formula": "z = (x − média) ÷ desvio",
+   "em_palavras": "quantos desvios da média",
+   "desvios": "1 desvio de bico = 5,45 mm; 1 desvio de massa = 801 g",
+   "intuicao": "O desvio é a régua de cada medida. Padronizado, 5,45 mm de bico pesam o mesmo que 801 g de massa; sem padronizar, 1 mm pesa o mesmo que 1 g.",
+   "conta_razao": "801 ÷ 5,45 = 147",
+   "intuicao_razao": "Sem padronizar, um desvio de diferença na massa entra na conta 147 vezes maior que um desvio de diferença no bico."
+  },
+  "peso_da_massa_sem_padronizar": {
+   "todos_os_pares": "99,995%",
+   "todos_os_pares_bico": "0,005%",
+   "intuicao_todos_os_pares": "Somando as diferenças ao quadrado entre todos os pares de pinguins, 99,995% vem da massa e 0,005% do bico.",
+   "conta_todos_os_pares": "801² ÷ (5,45² + 801²) = 641.601 ÷ (29,7025 + 641.601) = 99,995%",
+   "vizinhos": "342 de 342",
+   "intuicao_vizinhos": "Sem padronizar, para todos os 342 pinguins, os 5 vizinhos são simplesmente os 5 de peso mais parecido; o bico só desempata entre os de peso igual (71% dos vizinhos têm exatamente o mesmo peso)."
+  },
+  "misterioso": {
+   "quem": "um pinguim Barbicha de verdade, macho, da ilha Dream, medido em 2008 (linha 320 do arquivo)",
+   "bico": "50,9 mm",
+   "massa": "3.550 g",
+   "z": {
+    "bico": "+1,28",
+    "massa": "−0,81",
+    "conta_bico": "(50,9 − 43,9) ÷ 5,45 = +1,28",
+    "conta_massa": "(3.550 − 4.202) ÷ 801 = −0,81",
+    "em_palavras": "bico 1,3 desvio acima da média; massa 0,8 desvio abaixo",
+    "nota": "com a média e o desvio dos 342; com os 341 da rodada (sem ele) dá +1,28 e −0,82, e os vizinhos são os mesmos"
+   },
+   "sem_padronizar": {
+    "vizinhos": [
+     "Adélia · 42,2 mm · 3.550 g · d = 8,7",
+     "Adélia · 41,3 mm · 3.550 g · d = 9,6",
+     "Adélia · 40,6 mm · 3.550 g · d = 10,3",
+     "Adélia · 39,7 mm · 3.550 g · d = 11,2",
+     "Adélia · 39,6 mm · 3.550 g · d = 11,3"
+    ],
+    "voto": "5 Adélias × 0 Barbicha",
+    "previsao": "Adélia (errou)",
+    "intuicao": "Os 5 vizinhos são Adélias com exatamente 3.550 g, o mesmo peso dele, e bico 8,7 a 11,3 mm mais curto. A massa escolheu sozinha; a primeira Barbicha só aparece em 9º lugar na fila."
+   },
+   "padronizado": {
+    "vizinhos": [
+     "Barbicha · 51,3 mm · 3.650 g · d = 0,14",
+     "Barbicha · 50,9 mm · 3.675 g · d = 0,16",
+     "Barbicha · 51,3 mm · 3.700 g · d = 0,20",
+     "Barbicha · 50,5 mm · 3.400 g · d = 0,20",
+     "Barbicha · 49,7 mm · 3.600 g · d = 0,23"
+    ],
+    "voto": "5 Barbichas × 0 Adélia",
+    "previsao": "Barbicha (acertou)",
+    "intuicao": "Medindo as duas em desvios, os 5 vizinhos viram Barbichas: bico até 1,2 mm diferente e peso até 150 g. Nenhum vizinho em comum com a lista de antes; a primeira Adélia agora só aparece em 58º lugar."
+   },
+   "conta_ate_a_adelia": {
+    "vizinho": "Adélia · 42,2 mm · 3.550 g",
+    "deltas": "Δbico = 50,9 − 42,2 = 8,7 mm · Δmassa = 3.550 − 3.550 = 0 g",
+    "sem_padronizar": "d = √(8,7² + 0²) = √(75,69 + 0) = √75,69 = 8,7",
+    "padronizado_deltas": [
+     "8,7 mm ÷ 5,45 = 1,60",
+     "0 g ÷ 801 = 0"
+    ],
+    "padronizado": "d = √(1,60² + 0²) = √(2,56 + 0) = √2,56 = 1,60"
+   },
+   "conta_ate_a_barbicha": {
+    "vizinho": "Barbicha · 51,3 mm · 3.650 g",
+    "deltas": "Δbico = 51,3 − 50,9 = 0,4 mm · Δmassa = 3.650 − 3.550 = 100 g",
+    "sem_padronizar": "d = √(0,4² + 100²) = √(0,16 + 10.000) = √10.000,16 = 100,0",
+    "padronizado_deltas": [
+     "0,4 mm ÷ 5,45 = 0,07",
+     "100 g ÷ 801 = 0,12"
+    ],
+    "padronizado": "d = √(0,07² + 0,12²) = √(0,0049 + 0,0144) = √0,0193 = 0,14"
+   },
+   "veredito": {
+    "sem_padronizar": "Adélia 8,7 < Barbicha 100,0: a Adélia parece mais perto",
+    "padronizado": "Barbicha 0,14 < Adélia 1,60: agora a Barbicha está mais perto",
+    "intuicao": "Sem padronizar, os 100 g de diferença viram 10.000 na soma e os 0,4 mm de bico viram 0,16: a massa grita. A Adélia tem o mesmo peso, e os 8,7 mm de bico viram só 75,69, então ela 'ganha'. Padronizado, aqueles 8,7 mm são 1,60 desvio (longe), e 0,4 mm e 100 g são 0,07 e 0,12 desvio (perto)."
+   }
+  },
+  "acuracia_2_medidas": {
+   "como": "deixar-um-de-fora: esconde um pinguim, os outros 341 votam, repete para os 342; acurácia = acertos ÷ 342",
+   "sem_padronizar": "271 ÷ 342 = 79,2%",
+   "padronizado": "318 ÷ 342 = 93,0%",
+   "erros": {
+    "sem_padronizar": "71",
+    "padronizado": "24"
+   },
+   "barbichas_certas": {
+    "sem_padronizar": "30 de 68",
+    "padronizado": "60 de 68"
+   },
+   "barbichas_chamadas_de_adelia": {
+    "sem_padronizar": "33",
+    "padronizado": "5"
+   },
+   "mudam": "57 pinguins mudam de previsão: 51 passam a acertar, 4 passam a errar",
+   "conta_mudam": "271 + 51 − 4 = 318",
+   "intuicao": "Só de medir as duas na mesma régua, os erros caem de 71 para 24. Quem mais ganha é a Barbicha, que pesa igual à Adélia: sem padronizar, o KNN acerta 30 das 68 (chama 33 de Adélia); padronizado, 60.",
+   "ressalva_desempate": "Sem padronizar há 13 empates 2 a 2 no voto; o número cru depende do desempate: 271 com o da pauta, 269 se o 1º vizinho decide sempre, 274 no scikit-learn. Padronizado dá 318 em qualquer desempate."
+  },
+  "acuracia_4_medidas_apoio": {
+   "medidas": "bico (comprimento e altura), nadadeira e massa",
+   "sem_padronizar": "274 ÷ 342 = 80,1%",
+   "padronizado": "337 ÷ 342 = 98,5%",
+   "intuicao": "Com as 4 medidas o efeito é o mesmo, e maior: padronizado, o KNN erra só 5 de 342; sem padronizar, 68, porque a massa em gramas ainda manda nas outras três, em mm."
+  }
+ },
+ "pontos_2_medidas": {
+  "colunas": [
+   "linha_csv",
+   "especie",
+   "bico_mm",
+   "massa_g"
+  ],
+  "linhas": [
+   [
+    2,
+    "Adélia",
+    39.1,
+    3750
+   ],
+   [
+    3,
+    "Adélia",
+    39.5,
+    3800
+   ],
+   [
+    4,
+    "Adélia",
+    40.3,
+    3250
+   ],
+   [
+    6,
+    "Adélia",
+    36.7,
+    3450
+   ],
+   [
+    7,
+    "Adélia",
+    39.3,
+    3650
+   ],
+   [
+    8,
+    "Adélia",
+    38.9,
+    3625
+   ],
+   [
+    9,
+    "Adélia",
+    39.2,
+    4675
+   ],
+   [
+    10,
+    "Adélia",
+    34.1,
+    3475
+   ],
+   [
+    11,
+    "Adélia",
+    42.0,
+    4250
+   ],
+   [
+    12,
+    "Adélia",
+    37.8,
+    3300
+   ],
+   [
+    13,
+    "Adélia",
+    37.8,
+    3700
+   ],
+   [
+    14,
+    "Adélia",
+    41.1,
+    3200
+   ],
+   [
+    15,
+    "Adélia",
+    38.6,
+    3800
+   ],
+   [
+    16,
+    "Adélia",
+    34.6,
+    4400
+   ],
+   [
+    17,
+    "Adélia",
+    36.6,
+    3700
+   ],
+   [
+    18,
+    "Adélia",
+    38.7,
+    3450
+   ],
+   [
+    19,
+    "Adélia",
+    42.5,
+    4500
+   ],
+   [
+    20,
+    "Adélia",
+    34.4,
+    3325
+   ],
+   [
+    21,
+    "Adélia",
+    46.0,
+    4200
+   ],
+   [
+    22,
+    "Adélia",
+    37.8,
+    3400
+   ],
+   [
+    23,
+    "Adélia",
+    37.7,
+    3600
+   ],
+   [
+    24,
+    "Adélia",
+    35.9,
+    3800
+   ],
+   [
+    25,
+    "Adélia",
+    38.2,
+    3950
+   ],
+   [
+    26,
+    "Adélia",
+    38.8,
+    3800
+   ],
+   [
+    27,
+    "Adélia",
+    35.3,
+    3800
+   ],
+   [
+    28,
+    "Adélia",
+    40.6,
+    3550
+   ],
+   [
+    29,
+    "Adélia",
+    40.5,
+    3200
+   ],
+   [
+    30,
+    "Adélia",
+    37.9,
+    3150
+   ],
+   [
+    31,
+    "Adélia",
+    40.5,
+    3950
+   ],
+   [
+    32,
+    "Adélia",
+    39.5,
+    3250
+   ],
+   [
+    33,
+    "Adélia",
+    37.2,
+    3900
+   ],
+   [
+    34,
+    "Adélia",
+    39.5,
+    3300
+   ],
+   [
+    35,
+    "Adélia",
+    40.9,
+    3900
+   ],
+   [
+    36,
+    "Adélia",
+    36.4,
+    3325
+   ],
+   [
+    37,
+    "Adélia",
+    39.2,
+    4150
+   ],
+   [
+    38,
+    "Adélia",
+    38.8,
+    3950
+   ],
+   [
+    39,
+    "Adélia",
+    42.2,
+    3550
+   ],
+   [
+    40,
+    "Adélia",
+    37.6,
+    3300
+   ],
+   [
+    41,
+    "Adélia",
+    39.8,
+    4650
+   ],
+   [
+    42,
+    "Adélia",
+    36.5,
+    3150
+   ],
+   [
+    43,
+    "Adélia",
+    40.8,
+    3900
+   ],
+   [
+    44,
+    "Adélia",
+    36.0,
+    3100
+   ],
+   [
+    45,
+    "Adélia",
+    44.1,
+    4400
+   ],
+   [
+    46,
+    "Adélia",
+    37.0,
+    3000
+   ],
+   [
+    47,
+    "Adélia",
+    39.6,
+    4600
+   ],
+   [
+    48,
+    "Adélia",
+    41.1,
+    3425
+   ],
+   [
+    49,
+    "Adélia",
+    37.5,
+    2975
+   ],
+   [
+    50,
+    "Adélia",
+    36.0,
+    3450
+   ],
+   [
+    51,
+    "Adélia",
+    42.3,
+    4150
+   ],
+   [
+    52,
+    "Adélia",
+    39.6,
+    3500
+   ],
+   [
+    53,
+    "Adélia",
+    40.1,
+    4300
+   ],
+   [
+    54,
+    "Adélia",
+    35.0,
+    3450
+   ],
+   [
+    55,
+    "Adélia",
+    42.0,
+    4050
+   ],
+   [
+    56,
+    "Adélia",
+    34.5,
+    2900
+   ],
+   [
+    57,
+    "Adélia",
+    41.4,
+    3700
+   ],
+   [
+    58,
+    "Adélia",
+    39.0,
+    3550
+   ],
+   [
+    59,
+    "Adélia",
+    40.6,
+    3800
+   ],
+   [
+    60,
+    "Adélia",
+    36.5,
+    2850
+   ],
+   [
+    61,
+    "Adélia",
+    37.6,
+    3750
+   ],
+   [
+    62,
+    "Adélia",
+    35.7,
+    3150
+   ],
+   [
+    63,
+    "Adélia",
+    41.3,
+    4400
+   ],
+   [
+    64,
+    "Adélia",
+    37.6,
+    3600
+   ],
+   [
+    65,
+    "Adélia",
+    41.1,
+    4050
+   ],
+   [
+    66,
+    "Adélia",
+    36.4,
+    2850
+   ],
+   [
+    67,
+    "Adélia",
+    41.6,
+    3950
+   ],
+   [
+    68,
+    "Adélia",
+    35.5,
+    3350
+   ],
+   [
+    69,
+    "Adélia",
+    41.1,
+    4100
+   ],
+   [
+    70,
+    "Adélia",
+    35.9,
+    3050
+   ],
+   [
+    71,
+    "Adélia",
+    41.8,
+    4450
+   ],
+   [
+    72,
+    "Adélia",
+    33.5,
+    3600
+   ],
+   [
+    73,
+    "Adélia",
+    39.7,
+    3900
+   ],
+   [
+    74,
+    "Adélia",
+    39.6,
+    3550
+   ],
+   [
+    75,
+    "Adélia",
+    45.8,
+    4150
+   ],
+   [
+    76,
+    "Adélia",
+    35.5,
+    3700
+   ],
+   [
+    77,
+    "Adélia",
+    42.8,
+    4250
+   ],
+   [
+    78,
+    "Adélia",
+    40.9,
+    3700
+   ],
+   [
+    79,
+    "Adélia",
+    37.2,
+    3900
+   ],
+   [
+    80,
+    "Adélia",
+    36.2,
+    3550
+   ],
+   [
+    81,
+    "Adélia",
+    42.1,
+    4000
+   ],
+   [
+    82,
+    "Adélia",
+    34.6,
+    3200
+   ],
+   [
+    83,
+    "Adélia",
+    42.9,
+    4700
+   ],
+   [
+    84,
+    "Adélia",
+    36.7,
+    3800
+   ],
+   [
+    85,
+    "Adélia",
+    35.1,
+    4200
+   ],
+   [
+    86,
+    "Adélia",
+    37.3,
+    3350
+   ],
+   [
+    87,
+    "Adélia",
+    41.3,
+    3550
+   ],
+   [
+    88,
+    "Adélia",
+    36.3,
+    3800
+   ],
+   [
+    89,
+    "Adélia",
+    36.9,
+    3500
+   ],
+   [
+    90,
+    "Adélia",
+    38.3,
+    3950
+   ],
+   [
+    91,
+    "Adélia",
+    38.9,
+    3600
+   ],
+   [
+    92,
+    "Adélia",
+    35.7,
+    3550
+   ],
+   [
+    93,
+    "Adélia",
+    41.1,
+    4300
+   ],
+   [
+    94,
+    "Adélia",
+    34.0,
+    3400
+   ],
+   [
+    95,
+    "Adélia",
+    39.6,
+    4450
+   ],
+   [
+    96,
+    "Adélia",
+    36.2,
+    3300
+   ],
+   [
+    97,
+    "Adélia",
+    40.8,
+    4300
+   ],
+   [
+    98,
+    "Adélia",
+    38.1,
+    3700
+   ],
+   [
+    99,
+    "Adélia",
+    40.3,
+    4350
+   ],
+   [
+    100,
+    "Adélia",
+    33.1,
+    2900
+   ],
+   [
+    101,
+    "Adélia",
+    43.2,
+    4100
+   ],
+   [
+    102,
+    "Adélia",
+    35.0,
+    3725
+   ],
+   [
+    103,
+    "Adélia",
+    41.0,
+    4725
+   ],
+   [
+    104,
+    "Adélia",
+    37.7,
+    3075
+   ],
+   [
+    105,
+    "Adélia",
+    37.8,
+    4250
+   ],
+   [
+    106,
+    "Adélia",
+    37.9,
+    2925
+   ],
+   [
+    107,
+    "Adélia",
+    39.7,
+    3550
+   ],
+   [
+    108,
+    "Adélia",
+    38.6,
+    3750
+   ],
+   [
+    109,
+    "Adélia",
+    38.2,
+    3900
+   ],
+   [
+    110,
+    "Adélia",
+    38.1,
+    3175
+   ],
+   [
+    111,
+    "Adélia",
+    43.2,
+    4775
+   ],
+   [
+    112,
+    "Adélia",
+    38.1,
+    3825
+   ],
+   [
+    113,
+    "Adélia",
+    45.6,
+    4600
+   ],
+   [
+    114,
+    "Adélia",
+    39.7,
+    3200
+   ],
+   [
+    115,
+    "Adélia",
+    42.2,
+    4275
+   ],
+   [
+    116,
+    "Adélia",
+    39.6,
+    3900
+   ],
+   [
+    117,
+    "Adélia",
+    42.7,
+    4075
+   ],
+   [
+    118,
+    "Adélia",
+    38.6,
+    2900
+   ],
+   [
+    119,
+    "Adélia",
+    37.3,
+    3775
+   ],
+   [
+    120,
+    "Adélia",
+    35.7,
+    3350
+   ],
+   [
+    121,
+    "Adélia",
+    41.1,
+    3325
+   ],
+   [
+    122,
+    "Adélia",
+    36.2,
+    3150
+   ],
+   [
+    123,
+    "Adélia",
+    37.7,
+    3500
+   ],
+   [
+    124,
+    "Adélia",
+    40.2,
+    3450
+   ],
+   [
+    125,
+    "Adélia",
+    41.4,
+    3875
+   ],
+   [
+    126,
+    "Adélia",
+    35.2,
+    3050
+   ],
+   [
+    127,
+    "Adélia",
+    40.6,
+    4000
+   ],
+   [
+    128,
+    "Adélia",
+    38.8,
+    3275
+   ],
+   [
+    129,
+    "Adélia",
+    41.5,
+    4300
+   ],
+   [
+    130,
+    "Adélia",
+    39.0,
+    3050
+   ],
+   [
+    131,
+    "Adélia",
+    44.1,
+    4000
+   ],
+   [
+    132,
+    "Adélia",
+    38.5,
+    3325
+   ],
+   [
+    133,
+    "Adélia",
+    43.1,
+    3500
+   ],
+   [
+    134,
+    "Adélia",
+    36.8,
+    3500
+   ],
+   [
+    135,
+    "Adélia",
+    37.5,
+    4475
+   ],
+   [
+    136,
+    "Adélia",
+    38.1,
+    3425
+   ],
+   [
+    137,
+    "Adélia",
+    41.1,
+    3900
+   ],
+   [
+    138,
+    "Adélia",
+    35.6,
+    3175
+   ],
+   [
+    139,
+    "Adélia",
+    40.2,
+    3975
+   ],
+   [
+    140,
+    "Adélia",
+    37.0,
+    3400
+   ],
+   [
+    141,
+    "Adélia",
+    39.7,
+    4250
+   ],
+   [
+    142,
+    "Adélia",
+    40.2,
+    3400
+   ],
+   [
+    143,
+    "Adélia",
+    40.6,
+    3475
+   ],
+   [
+    144,
+    "Adélia",
+    32.1,
+    3050
+   ],
+   [
+    145,
+    "Adélia",
+    40.7,
+    3725
+   ],
+   [
+    146,
+    "Adélia",
+    37.3,
+    3000
+   ],
+   [
+    147,
+    "Adélia",
+    39.0,
+    3650
+   ],
+   [
+    148,
+    "Adélia",
+    39.2,
+    4250
+   ],
+   [
+    149,
+    "Adélia",
+    36.6,
+    3475
+   ],
+   [
+    150,
+    "Adélia",
+    36.0,
+    3450
+   ],
+   [
+    151,
+    "Adélia",
+    37.8,
+    3750
+   ],
+   [
+    152,
+    "Adélia",
+    36.0,
+    3700
+   ],
+   [
+    153,
+    "Adélia",
+    41.5,
+    4000
+   ],
+   [
+    154,
+    "Gentoo",
+    46.1,
+    4500
+   ],
+   [
+    155,
+    "Gentoo",
+    50.0,
+    5700
+   ],
+   [
+    156,
+    "Gentoo",
+    48.7,
+    4450
+   ],
+   [
+    157,
+    "Gentoo",
+    50.0,
+    5700
+   ],
+   [
+    158,
+    "Gentoo",
+    47.6,
+    5400
+   ],
+   [
+    159,
+    "Gentoo",
+    46.5,
+    4550
+   ],
+   [
+    160,
+    "Gentoo",
+    45.4,
+    4800
+   ],
+   [
+    161,
+    "Gentoo",
+    46.7,
+    5200
+   ],
+   [
+    162,
+    "Gentoo",
+    43.3,
+    4400
+   ],
+   [
+    163,
+    "Gentoo",
+    46.8,
+    5150
+   ],
+   [
+    164,
+    "Gentoo",
+    40.9,
+    4650
+   ],
+   [
+    165,
+    "Gentoo",
+    49.0,
+    5550
+   ],
+   [
+    166,
+    "Gentoo",
+    45.5,
+    4650
+   ],
+   [
+    167,
+    "Gentoo",
+    48.4,
+    5850
+   ],
+   [
+    168,
+    "Gentoo",
+    45.8,
+    4200
+   ],
+   [
+    169,
+    "Gentoo",
+    49.3,
+    5850
+   ],
+   [
+    170,
+    "Gentoo",
+    42.0,
+    4150
+   ],
+   [
+    171,
+    "Gentoo",
+    49.2,
+    6300
+   ],
+   [
+    172,
+    "Gentoo",
+    46.2,
+    4800
+   ],
+   [
+    173,
+    "Gentoo",
+    48.7,
+    5350
+   ],
+   [
+    174,
+    "Gentoo",
+    50.2,
+    5700
+   ],
+   [
+    175,
+    "Gentoo",
+    45.1,
+    5000
+   ],
+   [
+    176,
+    "Gentoo",
+    46.5,
+    4400
+   ],
+   [
+    177,
+    "Gentoo",
+    46.3,
+    5050
+   ],
+   [
+    178,
+    "Gentoo",
+    42.9,
+    5000
+   ],
+   [
+    179,
+    "Gentoo",
+    46.1,
+    5100
+   ],
+   [
+    180,
+    "Gentoo",
+    44.5,
+    4100
+   ],
+   [
+    181,
+    "Gentoo",
+    47.8,
+    5650
+   ],
+   [
+    182,
+    "Gentoo",
+    48.2,
+    4600
+   ],
+   [
+    183,
+    "Gentoo",
+    50.0,
+    5550
+   ],
+   [
+    184,
+    "Gentoo",
+    47.3,
+    5250
+   ],
+   [
+    185,
+    "Gentoo",
+    42.8,
+    4700
+   ],
+   [
+    186,
+    "Gentoo",
+    45.1,
+    5050
+   ],
+   [
+    187,
+    "Gentoo",
+    59.6,
+    6050
+   ],
+   [
+    188,
+    "Gentoo",
+    49.1,
+    5150
+   ],
+   [
+    189,
+    "Gentoo",
+    48.4,
+    5400
+   ],
+   [
+    190,
+    "Gentoo",
+    42.6,
+    4950
+   ],
+   [
+    191,
+    "Gentoo",
+    44.4,
+    5250
+   ],
+   [
+    192,
+    "Gentoo",
+    44.0,
+    4350
+   ],
+   [
+    193,
+    "Gentoo",
+    48.7,
+    5350
+   ],
+   [
+    194,
+    "Gentoo",
+    42.7,
+    3950
+   ],
+   [
+    195,
+    "Gentoo",
+    49.6,
+    5700
+   ],
+   [
+    196,
+    "Gentoo",
+    45.3,
+    4300
+   ],
+   [
+    197,
+    "Gentoo",
+    49.6,
+    4750
+   ],
+   [
+    198,
+    "Gentoo",
+    50.5,
+    5550
+   ],
+   [
+    199,
+    "Gentoo",
+    43.6,
+    4900
+   ],
+   [
+    200,
+    "Gentoo",
+    45.5,
+    4200
+   ],
+   [
+    201,
+    "Gentoo",
+    50.5,
+    5400
+   ],
+   [
+    202,
+    "Gentoo",
+    44.9,
+    5100
+   ],
+   [
+    203,
+    "Gentoo",
+    45.2,
+    5300
+   ],
+   [
+    204,
+    "Gentoo",
+    46.6,
+    4850
+   ],
+   [
+    205,
+    "Gentoo",
+    48.5,
+    5300
+   ],
+   [
+    206,
+    "Gentoo",
+    45.1,
+    4400
+   ],
+   [
+    207,
+    "Gentoo",
+    50.1,
+    5000
+   ],
+   [
+    208,
+    "Gentoo",
+    46.5,
+    4900
+   ],
+   [
+    209,
+    "Gentoo",
+    45.0,
+    5050
+   ],
+   [
+    210,
+    "Gentoo",
+    43.8,
+    4300
+   ],
+   [
+    211,
+    "Gentoo",
+    45.5,
+    5000
+   ],
+   [
+    212,
+    "Gentoo",
+    43.2,
+    4450
+   ],
+   [
+    213,
+    "Gentoo",
+    50.4,
+    5550
+   ],
+   [
+    214,
+    "Gentoo",
+    45.3,
+    4200
+   ],
+   [
+    215,
+    "Gentoo",
+    46.2,
+    5300
+   ],
+   [
+    216,
+    "Gentoo",
+    45.7,
+    4400
+   ],
+   [
+    217,
+    "Gentoo",
+    54.3,
+    5650
+   ],
+   [
+    218,
+    "Gentoo",
+    45.8,
+    4700
+   ],
+   [
+    219,
+    "Gentoo",
+    49.8,
+    5700
+   ],
+   [
+    220,
+    "Gentoo",
+    46.2,
+    4650
+   ],
+   [
+    221,
+    "Gentoo",
+    49.5,
+    5800
+   ],
+   [
+    222,
+    "Gentoo",
+    43.5,
+    4700
+   ],
+   [
+    223,
+    "Gentoo",
+    50.7,
+    5550
+   ],
+   [
+    224,
+    "Gentoo",
+    47.7,
+    4750
+   ],
+   [
+    225,
+    "Gentoo",
+    46.4,
+    5000
+   ],
+   [
+    226,
+    "Gentoo",
+    48.2,
+    5100
+   ],
+   [
+    227,
+    "Gentoo",
+    46.5,
+    5200
+   ],
+   [
+    228,
+    "Gentoo",
+    46.4,
+    4700
+   ],
+   [
+    229,
+    "Gentoo",
+    48.6,
+    5800
+   ],
+   [
+    230,
+    "Gentoo",
+    47.5,
+    4600
+   ],
+   [
+    231,
+    "Gentoo",
+    51.1,
+    6000
+   ],
+   [
+    232,
+    "Gentoo",
+    45.2,
+    4750
+   ],
+   [
+    233,
+    "Gentoo",
+    45.2,
+    5950
+   ],
+   [
+    234,
+    "Gentoo",
+    49.1,
+    4625
+   ],
+   [
+    235,
+    "Gentoo",
+    52.5,
+    5450
+   ],
+   [
+    236,
+    "Gentoo",
+    47.4,
+    4725
+   ],
+   [
+    237,
+    "Gentoo",
+    50.0,
+    5350
+   ],
+   [
+    238,
+    "Gentoo",
+    44.9,
+    4750
+   ],
+   [
+    239,
+    "Gentoo",
+    50.8,
+    5600
+   ],
+   [
+    240,
+    "Gentoo",
+    43.4,
+    4600
+   ],
+   [
+    241,
+    "Gentoo",
+    51.3,
+    5300
+   ],
+   [
+    242,
+    "Gentoo",
+    47.5,
+    4875
+   ],
+   [
+    243,
+    "Gentoo",
+    52.1,
+    5550
+   ],
+   [
+    244,
+    "Gentoo",
+    47.5,
+    4950
+   ],
+   [
+    245,
+    "Gentoo",
+    52.2,
+    5400
+   ],
+   [
+    246,
+    "Gentoo",
+    45.5,
+    4750
+   ],
+   [
+    247,
+    "Gentoo",
+    49.5,
+    5650
+   ],
+   [
+    248,
+    "Gentoo",
+    44.5,
+    4850
+   ],
+   [
+    249,
+    "Gentoo",
+    50.8,
+    5200
+   ],
+   [
+    250,
+    "Gentoo",
+    49.4,
+    4925
+   ],
+   [
+    251,
+    "Gentoo",
+    46.9,
+    4875
+   ],
+   [
+    252,
+    "Gentoo",
+    48.4,
+    4625
+   ],
+   [
+    253,
+    "Gentoo",
+    51.1,
+    5250
+   ],
+   [
+    254,
+    "Gentoo",
+    48.5,
+    4850
+   ],
+   [
+    255,
+    "Gentoo",
+    55.9,
+    5600
+   ],
+   [
+    256,
+    "Gentoo",
+    47.2,
+    4975
+   ],
+   [
+    257,
+    "Gentoo",
+    49.1,
+    5500
+   ],
+   [
+    258,
+    "Gentoo",
+    47.3,
+    4725
+   ],
+   [
+    259,
+    "Gentoo",
+    46.8,
+    5500
+   ],
+   [
+    260,
+    "Gentoo",
+    41.7,
+    4700
+   ],
+   [
+    261,
+    "Gentoo",
+    53.4,
+    5500
+   ],
+   [
+    262,
+    "Gentoo",
+    43.3,
+    4575
+   ],
+   [
+    263,
+    "Gentoo",
+    48.1,
+    5500
+   ],
+   [
+    264,
+    "Gentoo",
+    50.5,
+    5000
+   ],
+   [
+    265,
+    "Gentoo",
+    49.8,
+    5950
+   ],
+   [
+    266,
+    "Gentoo",
+    43.5,
+    4650
+   ],
+   [
+    267,
+    "Gentoo",
+    51.5,
+    5500
+   ],
+   [
+    268,
+    "Gentoo",
+    46.2,
+    4375
+   ],
+   [
+    269,
+    "Gentoo",
+    55.1,
+    5850
+   ],
+   [
+    270,
+    "Gentoo",
+    44.5,
+    4875
+   ],
+   [
+    271,
+    "Gentoo",
+    48.8,
+    6000
+   ],
+   [
+    272,
+    "Gentoo",
+    47.2,
+    4925
+   ],
+   [
+    274,
+    "Gentoo",
+    46.8,
+    4850
+   ],
+   [
+    275,
+    "Gentoo",
+    50.4,
+    5750
+   ],
+   [
+    276,
+    "Gentoo",
+    45.2,
+    5200
+   ],
+   [
+    277,
+    "Gentoo",
+    49.9,
+    5400
+   ],
+   [
+    278,
+    "Barbicha",
+    46.5,
+    3500
+   ],
+   [
+    279,
+    "Barbicha",
+    50.0,
+    3900
+   ],
+   [
+    280,
+    "Barbicha",
+    51.3,
+    3650
+   ],
+   [
+    281,
+    "Barbicha",
+    45.4,
+    3525
+   ],
+   [
+    282,
+    "Barbicha",
+    52.7,
+    3725
+   ],
+   [
+    283,
+    "Barbicha",
+    45.2,
+    3950
+   ],
+   [
+    284,
+    "Barbicha",
+    46.1,
+    3250
+   ],
+   [
+    285,
+    "Barbicha",
+    51.3,
+    3750
+   ],
+   [
+    286,
+    "Barbicha",
+    46.0,
+    4150
+   ],
+   [
+    287,
+    "Barbicha",
+    51.3,
+    3700
+   ],
+   [
+    288,
+    "Barbicha",
+    46.6,
+    3800
+   ],
+   [
+    289,
+    "Barbicha",
+    51.7,
+    3775
+   ],
+   [
+    290,
+    "Barbicha",
+    47.0,
+    3700
+   ],
+   [
+    291,
+    "Barbicha",
+    52.0,
+    4050
+   ],
+   [
+    292,
+    "Barbicha",
+    45.9,
+    3575
+   ],
+   [
+    293,
+    "Barbicha",
+    50.5,
+    4050
+   ],
+   [
+    294,
+    "Barbicha",
+    50.3,
+    3300
+   ],
+   [
+    295,
+    "Barbicha",
+    58.0,
+    3700
+   ],
+   [
+    296,
+    "Barbicha",
+    46.4,
+    3450
+   ],
+   [
+    297,
+    "Barbicha",
+    49.2,
+    4400
+   ],
+   [
+    298,
+    "Barbicha",
+    42.4,
+    3600
+   ],
+   [
+    299,
+    "Barbicha",
+    48.5,
+    3400
+   ],
+   [
+    300,
+    "Barbicha",
+    43.2,
+    2900
+   ],
+   [
+    301,
+    "Barbicha",
+    50.6,
+    3800
+   ],
+   [
+    302,
+    "Barbicha",
+    46.7,
+    3300
+   ],
+   [
+    303,
+    "Barbicha",
+    52.0,
+    4150
+   ],
+   [
+    304,
+    "Barbicha",
+    50.5,
+    3400
+   ],
+   [
+    305,
+    "Barbicha",
+    49.5,
+    3800
+   ],
+   [
+    306,
+    "Barbicha",
+    46.4,
+    3700
+   ],
+   [
+    307,
+    "Barbicha",
+    52.8,
+    4550
+   ],
+   [
+    308,
+    "Barbicha",
+    40.9,
+    3200
+   ],
+   [
+    309,
+    "Barbicha",
+    54.2,
+    4300
+   ],
+   [
+    310,
+    "Barbicha",
+    42.5,
+    3350
+   ],
+   [
+    311,
+    "Barbicha",
+    51.0,
+    4100
+   ],
+   [
+    312,
+    "Barbicha",
+    49.7,
+    3600
+   ],
+   [
+    313,
+    "Barbicha",
+    47.5,
+    3900
+   ],
+   [
+    314,
+    "Barbicha",
+    47.6,
+    3850
+   ],
+   [
+    315,
+    "Barbicha",
+    52.0,
+    4800
+   ],
+   [
+    316,
+    "Barbicha",
+    46.9,
+    2700
+   ],
+   [
+    317,
+    "Barbicha",
+    53.5,
+    4500
+   ],
+   [
+    318,
+    "Barbicha",
+    49.0,
+    3950
+   ],
+   [
+    319,
+    "Barbicha",
+    46.2,
+    3650
+   ],
+   [
+    320,
+    "Barbicha",
+    50.9,
+    3550
+   ],
+   [
+    321,
+    "Barbicha",
+    45.5,
+    3500
+   ],
+   [
+    322,
+    "Barbicha",
+    50.9,
+    3675
+   ],
+   [
+    323,
+    "Barbicha",
+    50.8,
+    4450
+   ],
+   [
+    324,
+    "Barbicha",
+    50.1,
+    3400
+   ],
+   [
+    325,
+    "Barbicha",
+    49.0,
+    4300
+   ],
+   [
+    326,
+    "Barbicha",
+    51.5,
+    3250
+   ],
+   [
+    327,
+    "Barbicha",
+    49.8,
+    3675
+   ],
+   [
+    328,
+    "Barbicha",
+    48.1,
+    3325
+   ],
+   [
+    329,
+    "Barbicha",
+    51.4,
+    3950
+   ],
+   [
+    330,
+    "Barbicha",
+    45.7,
+    3600
+   ],
+   [
+    331,
+    "Barbicha",
+    50.7,
+    4050
+   ],
+   [
+    332,
+    "Barbicha",
+    42.5,
+    3350
+   ],
+   [
+    333,
+    "Barbicha",
+    52.2,
+    3450
+   ],
+   [
+    334,
+    "Barbicha",
+    45.2,
+    3250
+   ],
+   [
+    335,
+    "Barbicha",
+    49.3,
+    4050
+   ],
+   [
+    336,
+    "Barbicha",
+    50.2,
+    3800
+   ],
+   [
+    337,
+    "Barbicha",
+    45.6,
+    3525
+   ],
+   [
+    338,
+    "Barbicha",
+    51.9,
+    3950
+   ],
+   [
+    339,
+    "Barbicha",
+    46.8,
+    3650
+   ],
+   [
+    340,
+    "Barbicha",
+    45.7,
+    3650
+   ],
+   [
+    341,
+    "Barbicha",
+    55.8,
+    4000
+   ],
+   [
+    342,
+    "Barbicha",
+    43.5,
+    3400
+   ],
+   [
+    343,
+    "Barbicha",
+    49.6,
+    3775
+   ],
+   [
+    344,
+    "Barbicha",
+    50.8,
+    4100
+   ],
+   [
+    345,
+    "Barbicha",
+    50.2,
+    3775
+   ]
+  ]
+ }
+}
