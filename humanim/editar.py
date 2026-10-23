@@ -1387,8 +1387,8 @@ def resumo(pasta, linhas, ouvidas=None):
     if pequenas:
         texto.append(f"Diferenças pequenas, provavelmente da transcrição: linha {', '.join(pequenas)}.")
     texto.append(f"O que saiu e o que ficou, por linha: {relativo(pasta / EDICAO)} (cortes, diferencas).")
-    texto.append(f"Próximo, um de cada vez (cada um é pesado): humanim animar {relativo(pasta / 'roteiro.md')} "
-                 f"(cenas na duração da fala editada); depois humanim tratar {relativo(pasta / 'gravacao.webm')} "
-                 f"(minutos: em segundo plano só para não estourar o tempo limite, sozinho, e espere o OK dele); "
-                 f"só então humanim montar {relativo(pasta)}")
+    texto.append(f"Próximo, numa tacada só e em segundo plano (cada um espera a vez na fila; o && para no primeiro "
+                 f"ERRO): humanim animar {relativo(pasta / 'roteiro.md')} && humanim tratar "
+                 f"{relativo(pasta / 'gravacao.webm')} && humanim montar {relativo(pasta)} && humanim frames "
+                 f"{relativo(pasta / 'saida.mp4')}")
     return texto

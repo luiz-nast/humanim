@@ -20,6 +20,7 @@ import numpy as np
 
 from .comum import (MIOLO_3X4, RAIZ, VIDEO_DO_ZERO, Erro, duracao, identidade, miolo_3x4, ok, pasta_do_video,
                     relativo, rodar, trabalho)
+from . import fila
 from .formato import FPS
 from .roteiro import ler_roteiro, ler_tempos
 
@@ -192,7 +193,7 @@ def tratar(pasta, args):
     dec = subprocess.Popen(["ffmpeg", "-nostdin", "-v", "error", "-i", entrada, "-map", "0:v:0",
                             "-vf", f"{VIDEO_DO_ZERO},scale={w}:{h},{MIOLO_3X4}",
                             "-f", "rawvideo", "-pix_fmt", "gbrpf32le", "pipe:1"],
-                           stdout=subprocess.PIPE, stderr=log_dec.open("w"))
+                           stdout=subprocess.PIPE, stderr=log_dec.open("w"), pass_fds=fila.vez())
     enc = subprocess.Popen(["ffmpeg", "-nostdin", "-v", "error", "-y",
                             "-f", "rawvideo", "-pix_fmt", "gbrap", "-s", f"{mw}x{mh}", "-r", str(FPS), "-i", "pipe:0",
                             "-i", entrada, "-map", "0:v", "-map", "1:a?",
@@ -200,7 +201,7 @@ def tratar(pasta, args):
                             "-deadline", "realtime", "-cpu-used", "8", "-row-mt", "1",
                             "-c:a", "copy", "-metadata", f"humanim_fonte={fonte}", "-metadata", f"humanim_quadros={marcado}",
                             "-f", "webm", parcial],
-                           stdin=subprocess.PIPE, stderr=log_enc.open("w"))
+                           stdin=subprocess.PIPE, stderr=log_enc.open("w"), pass_fds=fila.vez())
     tamanho = 3 * mw * mh * 4
     zerado = {f"r{i}i": np.zeros((1, 1, 1, 1), np.float32) for i in range(1, 5)}
     estado = zerado

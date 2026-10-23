@@ -382,11 +382,8 @@ def resumo(pasta, linhas, tempos, regravadas, segundos, sufixo, guardada=False):
                      f"Grave de novo até o fim: humanim gravar {roteiro} (esta parcial vai para anteriores/).")
     else:
         texto[0] = "gravação salva: " + texto[0]
-        texto.append(f"Próximo, um de cada vez (cada um é pesado): humanim editar "
-                     f"{relativo(pasta / 'gravacao.webm')} (corta pausas, muletas e repetições, e diz se alguma fala saiu diferente do roteiro); depois "
-                     f"humanim animar {roteiro} (refaz as cenas na duração da fala editada); depois humanim tratar "
-                     f"{relativo(pasta / 'gravacao.webm')} (minutos: em segundo plano só para não estourar o tempo "
-                     f"limite, sozinho, e espere o OK dele); só então humanim montar {relativo(pasta)}")
+        texto.append(f"Próximo: humanim editar {relativo(pasta / 'gravacao.webm')} (corta pausas, muletas e "
+                     f"repetições, e diz se alguma fala saiu diferente do roteiro); ele diz o resto.")
     return texto
 
 

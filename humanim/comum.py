@@ -7,6 +7,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from . import fila
 from .formato import FPS
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -83,7 +84,7 @@ def trabalho(pasta):
 
 def rodar(cmd, o_que):
     """Roda um comando externo; se falhar, vira Erro com o fim do stderr."""
-    r = subprocess.run([str(c) for c in cmd], capture_output=True, text=True)
+    r = subprocess.run([str(c) for c in cmd], capture_output=True, text=True, pass_fds=fila.vez())
     if r.returncode != 0:
         fim = "\n".join(r.stderr.strip().splitlines()[-6:])
         raise Erro(f"{o_que} falhou:\n{fim}")

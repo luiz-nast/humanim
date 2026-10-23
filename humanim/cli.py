@@ -4,7 +4,12 @@ import errno
 import importlib
 import sys
 
+from . import fila
 from .comum import RAIZ, Erro, comandos, ok
+
+# Esperam a vez na fila da máquina (fila.py): os que passam de ~1 GB ou ocupam a CPU toda, e o gravar, para nada
+# pesado começar no meio de uma tomada.
+PESADOS = {"animar", "editar", "tratar", "montar", "gravar"}
 
 
 def novo(args):
@@ -57,6 +62,8 @@ def main():
         if args.comando == "novo":
             novo(args)
         else:
+            if args.comando in PESADOS:
+                fila.entrar(f"humanim {args.comando}")
             importlib.import_module(f"humanim.{args.comando}").main(args)
     except Erro as e:
         print(f"ERRO {comandos(str(e))}", flush=True)

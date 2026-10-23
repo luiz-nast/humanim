@@ -13,6 +13,7 @@ Cada linha `[ANIM: …]` ou `[CANTO: …]` do `roteiro.md` vira uma cena Manim q
 2. Leia `estilo/estilo.py`: é a identidade visual. Cor, fonte e tamanho saem só de lá.
 3. Se já existe `cenas/comum.py` ou cenas de outras linhas, leia antes de mexer: mudar o `comum.py` muda todas as linhas que o usam.
 4. Arquivo grande (o `comum.py`, uma cena longa) sai em partes: o esqueleto num Write, depois uma parte por Edit, umas 150 linhas cada. Uma resposta que escreve o arquivo inteiro de uma vez pode cair no meio e perder tudo; em partes, o que já foi salvo fica. Se você está recomeçando um trabalho, leia o que já está no disco e continue dali.
+5. Memória: render e teste de cena (tudo que importa o estilo ou o `comum.py`) esperam a vez na fila da máquina sozinhos, então vários agentes de cena podem trabalhar juntos. Não rode o Manim por fora (nada de `import manim` direto) e leia o `dados/resultados.json` pelas chaves que a cena usa (com `python` e `json`): ele pode ter milhares de pontos.
 
 ## O arquivo
 

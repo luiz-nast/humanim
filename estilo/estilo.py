@@ -5,7 +5,11 @@ Reexporta o Manim e fixa tela vertical, cores, fonte e tamanhos, iguais em todo 
 import os
 import re
 
-from manim import *  # noqa: F401,F403
+from humanim.fila import entrar as _entrar_na_fila
+
+_entrar_na_fila("esta cena")  # antes do Manim, que é o que pesa: cenas e testes de cena vão um por vez na máquina
+
+from manim import *  # noqa: E402,F401,F403
 from manim import config, np
 
 from humanim.formato import ALTURA, CANTO, FAIXA_TOPO, FPS, LARGURA

@@ -9,6 +9,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from . import fila
 from .comum import RAIZ, Erro, contar_quadros, memoria_livre, ok, pasta_do_video, relativo, rodar, trabalho
 from .formato import ALTURA, FPS, LARGURA
 from .roteiro import EDICAO, ler_roteiro, ler_tempos, quadros
@@ -42,15 +43,29 @@ def paralelo():
     return n, f"{livre:.1f} GB de memória livre"
 
 
-def ajudantes(cenas):
-    """Os módulos que as cenas importam (comum.py, bloco_2.py…): tudo em cenas/ que não é uma linha_NN.py."""
-    return sorted(p for p in cenas.glob("*.py") if not p.name.startswith("linha_")) or [cenas / "comum.py"]
+IMPORTA = re.compile(r"^\s*(?:from\s+(\w+)\s+import|import\s+(\w+))", re.M)
+
+
+def ajudantes(cena):
+    """Os módulos de cenas/ que esta cena usa (comum.py, bloco_2.py…), direto ou por outro módulo de cenas/:
+    mexer no bloco de uma linha não deixa velhas as cenas que não o importam."""
+    vistos, abertos = set(), [cena]
+    while abertos:
+        arq = abertos.pop()
+        texto = arq.read_text(errors="replace") if arq.exists() else ""
+        for m in IMPORTA.finditer(texto):
+            modulo = cena.parent / f"{m.group(1) or m.group(2)}.py"
+            if modulo.exists() and modulo != cena and modulo not in vistos:
+                vistos.add(modulo)
+                abertos.append(modulo)
+    return sorted(vistos)
 
 
 def assinatura(cena, linha):
-    """Muda quando muda algo que altera o clipe: a cena, os ajudantes de cenas/, as DEPENDENCIAS, a marca ou a fala."""
+    """Muda quando muda algo que altera o clipe: a cena, os módulos de cenas/ que ela usa, as DEPENDENCIAS, a marca ou a
+    fala."""
     h = hashlib.sha256()
-    for arq in (*DEPENDENCIAS, *ajudantes(cena.parent), cena):
+    for arq in (*DEPENDENCIAS, *ajudantes(cena), cena):
         h.update(arq.read_bytes() if arq.exists() else b"-")
     h.update(f"{linha.marca}|{linha.fala}|{os.environ.get('HUMANIM_DEPURAR', '')}".encode())
     return h.hexdigest()[:16]
@@ -120,7 +135,8 @@ def renderizar(cena, linha, alvo, media):
     cmd = [sys.executable, "-c", MANIM, "render", "-r", f"{LARGURA},{ALTURA}", "--fps", str(FPS),
            "--disable_caching", "--media_dir", str(media), "--progress_bar", "none", "-v", "WARNING",
            "-o", linha.cena, str(cena), "Cena"]
-    r = subprocess.run(cmd, capture_output=True, text=True, cwd=media, env=env, stdin=subprocess.DEVNULL)
+    r = subprocess.run(cmd, capture_output=True, text=True, cwd=media, env=env, stdin=subprocess.DEVNULL,
+                       pass_fds=fila.vez())
     if r.returncode != 0:
         raise Erro(explicar_falha(r.stderr, cena))
     videos = list(media.glob(f"videos/*/*/{linha.cena}.mp4"))
