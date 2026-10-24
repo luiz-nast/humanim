@@ -13,7 +13,7 @@ humanim/
   estilo/estilo.py          # cores, fonte, fundo e peças das animações (rotulo, conta, br, lupa)
   humanim/                  # o código do comando humanim
   modelos/                  # remoção de fundo e modelos de fala em whisper/ (baixam sozinhos; fora do Git)
-  videos/                   # uma pasta por vídeo (o projeto vai para o Git; a mídia pesada, não)
+  videos/                   # uma pasta por vídeo, só no computador (fora do Git)
     <slug>/
       teoria.md  fontes.md  dados/  pesquisa/  # a pesquisa: o mecanismo, as fontes, os números e o material bruto
       roteiro.md  cenas/  tempos.json  gravacao.webm  edicao.json  gravacao-tratada.webm  saida.mp4  frames/
@@ -22,7 +22,7 @@ humanim/
 
 - O Claude é aberto uma vez, na raiz. Para mexer num vídeo, a pasta é apontada ("ajusta a linha 3 de videos/arvore-de-decisao") e o trabalho fica só ali.
 - O comando é `humanim` (o `./instalar.sh` põe um link em `~/.local/bin`; sem ele, use `.venv/bin/humanim`). Rode sempre da raiz, com os caminhos `videos/<slug>/...`. Toda saída começa com `OK` ou `ERRO`, e todo erro diz onde está e o que fazer, com os comandos já prontos para colar.
-- Vai para o GitHub: o código, as skills, o estilo e o projeto de cada vídeo (roteiro, `teoria.md`, `fontes.md`, `dados/`, as cenas `.py`, `tempos.json`, `edicao.json`). Fica só no computador: a mídia pesada (gravações, clipes, `saida.mp4`, `.trabalho/`, `anteriores/`, `frames/`), o material bruto da pesquisa (`pesquisa/`, que pode ter PDF com direitos autorais), os `modelos/` e as pastas de teste (`videos/.testes/` e `videos/teste-*`). Dataset acima de 20 MB também fica fora; o `fontes.md` diz de onde baixar. Quem apresenta autorizou commit e push do projeto do vídeo a cada marco (skill `diretor`).
+- Vai para o GitHub: o código, as skills (com os exemplos que os agentes leem em `.claude/skills/*/exemplos/`), os fluxos de agentes e o estilo. Os projetos dos vídeos (`videos/`) ficam só no computador, por decisão de quem apresenta (23/10/2026): nada de commit de vídeo. Dataset, PDF e mídia continuam fora pelo mesmo motivo. Um bom roteiro, pauta ou `comum.py` que valha de exemplo vai para a pasta `exemplos/` da skill, copiado.
 
 ## Fazer um vídeo
 

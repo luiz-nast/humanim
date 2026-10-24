@@ -91,12 +91,7 @@ São medições feitas com uma gravação de teste. A primeira gravação de ver
 
 ## Vídeos
 
-| Vídeo | O que explica | Dados | Situação |
-| --- | --- | --- | --- |
-| [Árvore de decisão](videos/arvore-de-decisao/roteiro.md?plain=1) | Como a árvore escolhe a melhor pergunta para separar quem paga de quem dá calote | 30 mil clientes de cartão de crédito de Taiwan, 2005, da [base pública da Universidade da Califórnia em Irvine](https://archive.ics.uci.edu/dataset/350/default+of+credit+card+clients) | roteiro, animações e prévia prontos; falta gravar |
-| [KNN, k vizinhos mais próximos](videos/knn/roteiro.md?plain=1) | Por que, sem padronizar as medidas, o peso em gramas decide sozinho quem é vizinho | 342 pinguins da Antártida (Palmer Station, Gorman, Williams & Fraser, 2014), via [palmerpenguins](https://allisonhorst.github.io/palmerpenguins/), domínio público | roteiro, animações e prévia prontos; falta gravar |
-
-Cada pasta em `videos/` guarda o projeto do vídeo: o roteiro, a pesquisa escrita ([exemplo das fontes](videos/arvore-de-decisao/fontes.md)), os dados, o programa que calcula os números e o código das animações. A gravação e o vídeo final ficam só no computador, porque são pesados demais para o GitHub.
+Cada vídeo é uma pasta em `videos/` com o roteiro, a pesquisa, os dados, o código das animações e a gravação. Ela fica só no computador de quem grava: não vai para o GitHub. Os bons exemplos, que ensinam os agentes, ficam nas skills (`.claude/skills/*/exemplos/`).
 
 ---
 
@@ -146,7 +141,7 @@ CLAUDE.md          como o Claude deve trabalhar neste projeto
 .claude/skills/    os manuais do Claude: diretor (toca o vídeo inteiro), roteiro e cenas
 estilo/            cores, fonte e fundo das animações
 humanim/           o código do comando humanim
-videos/            um projeto por vídeo
+videos/            um projeto por vídeo (só no computador)
 docs/              imagens deste README
 ```
 

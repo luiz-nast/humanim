@@ -5,20 +5,6 @@ media/
 modelos/
 *.egg-info/
 
-# Vídeos: o projeto de cada vídeo vai para o GitHub (roteiro, pesquisa, fontes, dados, cenas, tempos, edição).
-# Fica só no computador a mídia pesada, o que os comandos refazem e as pastas de teste.
-videos/.testes/
-videos/.workflows/
-videos/teste-*/
-videos/sim-*/
-videos/revisao-*/
-videos/correcoes-*/
-videos/*/.trabalho/
-videos/*/anteriores/
-videos/*/frames/
-videos/*/previa.html
-videos/*/*.webm
-videos/*/*.mp4
-videos/*/cenas/*.mp4
-videos/*/cenas/render.json
-videos/*/pesquisa/
+# Vídeos: os projetos ficam só no computador de quem grava (decisão de 23/10/2026); exemplos para os agentes
+# moram nas skills (.claude/skills/*/exemplos/).
+videos/

@@ -22,7 +22,7 @@ Escreva só teoria.md, pesquisa/fontes-teoria.md e o material em pesquisa/.
 DEVOLVA (curto, por itens): as 3 a 5 ideias centrais para o roteiro, as armadilhas mais perigosas e as dúvidas de fonte.`, { label: 'pesquisa:teoria', phase: 'Pesquisa' }),
   () => agent(`${BASE}
 
-SEU PAPEL: pesquisador de dados (skill diretor, item 2). Exemplo do nível esperado: videos/knn/dados/calcular.py e o bloco para_tela de videos/knn/dados/resultados.json.
+SEU PAPEL: pesquisador de dados (skill diretor, item 2). Exemplo do nível esperado: .claude/skills/diretor/exemplos/calcular-knn.py e .claude/skills/diretor/exemplos/para_tela-knn.json.
 1. Baixe o dataset da pauta de uma fonte estável; registre URL, data, tamanho e SHA-256 e descubra a licença. Sem licença aberta explícita: o arquivo fica em ${PASTA}/pesquisa/ (fora do GitHub) e o calcular.py lê de lá, com o comando de download no topo; com licença aberta, vai em ${PASTA}/dados/ com o texto da licença.
 2. ${PASTA}/dados/calcular.py calcula cada número da lista da pauta e grava ${PASTA}/dados/resultados.json, com o bloco "para_tela" (cada número como a tela escreve, vírgula decimal e ponto de milhar; cada conta fechando com os números mostrados, encadeada; a intuição de cada número em palavras) e "cuidados". Se a cena vai desenhar pontos, grave também os pontos com o grupo ou a classe de cada etapa.
 MOLDE: os números da lista da pauta, conferidos com uma biblioteca de referência quando houver. Conferência extra só se ela pode mudar o que o vídeo diz; anote nos cuidados o que ficou aberto, sem investigar a fundo.
@@ -34,7 +34,7 @@ DEVOLVA (curto, por itens): licença e onde ficou o arquivo; os números da list
 phase('Roteiro')
 const roteiro = await agent(`${BASE}
 
-SEU PAPEL: roteirista. Leia a skill .claude/skills/roteiro/ inteira (SKILL.md, voz.md, temas.md), ${PASTA}/teoria.md e ${PASTA}/dados/resultados.json (o bloco para_tela e os cuidados; não leia a lista de pontos). Como referência do nível, leia videos/knn/roteiro.md e videos/kmeans/roteiro.md (copie a profundidade e o nexo, não a forma).
+SEU PAPEL: roteirista. Leia a skill .claude/skills/roteiro/ inteira (SKILL.md, voz.md, temas.md), ${PASTA}/teoria.md e ${PASTA}/dados/resultados.json (o bloco para_tela e os cuidados; não leia a lista de pontos). Como referência do nível, leia .claude/skills/roteiro/exemplos/knn.md e kmeans.md (copie a profundidade e o nexo, não a forma).
 
 Resumo dos pesquisadores:
 TEORIA: ${teoria}
